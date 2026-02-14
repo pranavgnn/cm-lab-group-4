@@ -1,0 +1,19 @@
+{
+  "/api/*": {
+    "target": "http://localhost:8080",
+    "secure": false,
+    "logLevel": "debug",
+    "pathRewrite": {
+      "^/api": ""
+    },
+    "changeOrigin": true
+  },
+  "/socket/*": {
+    "target": "ws://localhost:8080",
+    "secure": false,
+    "ws": true,
+    "pathRewrite": {
+      "^/socket": ""
+    }
+  }
+}

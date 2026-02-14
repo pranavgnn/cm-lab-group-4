@@ -1,0 +1,124 @@
+<div class="app-container">
+  <header class="header">
+    <h1>{{ title }}</h1>
+    <div class="session-controls">
+      <span class="status-indicator" [class.connected]="sessionInfo?.isConnected">
+        {{ sessionInfo?.isConnected ? 'Connected' : 'Disconnected' }}
+      </span>
+      <button class="btn-session" (click)="logon()" *ngIf="!sessionInfo?.isConnected">Logon</button>
+      <button class="btn-session btn-logout" (click)="logout()" *ngIf="sessionInfo?.isConnected">Logout</button>
+    </div>
+  </header>
+  
+  <main class="main-content">
+    <div class="order-form-section">
+      <h2>Submit New Order</h2>
+      <div class="order-form">
+        <div class="form-group">
+          <label>Symbol</label>
+          <select [(ngModel)]="newOrder.symbol">
+            <option value="AAPL">AAPL</option>
+            <option value="MSFT">MSFT</option>
+            <option value="GOOGL">GOOGL</option>
+            <option value="AMZN">AMZN</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Side</label>
+          <select [(ngModel)]="newOrder.side">
+            <option value="1">BUY</option>
+            <option value="2">SELL</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Quantity</label>
+          <input type="number" [(ngModel)]="newOrder.quantity" min="1">
+        </div>
+        <div class="form-group">
+          <label>Price</label>
+          <input type="number" [(ngModel)]="newOrder.price" min="0" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <select [(ngModel)]="newOrder.orderType">
+            <option value="LIMIT">LIMIT</option>
+            <option value="MARKET">MARKET</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>TIF</label>
+          <select [(ngModel)]="newOrder.timeInForce">
+            <option value="DAY">DAY</option>
+            <option value="GTC">GTC</option>
+            <option value="IOC">IOC</option>
+          </select>
+        </div>
+        <button class="btn-submit" (click)="submitOrder()" [disabled]="!sessionInfo?.isConnected">
+          Submit Order
+        </button>
+      </div>
+    </div>
+    
+    <div class="orders-section">
+      <div class="section-header">
+        <h2>Orders</h2>
+        <button class="btn-refresh" (click)="refreshOrders()">
+          ↻ Refresh
+        </button>
+      </div>
+      
+      <div class="alert alert-error" *ngIf="error">
+        {{ error }}
+      </div>
+      
+      <div class="loading" *ngIf="loading">
+        Loading orders...
+      </div>
+      
+      <div class="orders-table-container" *ngIf="!loading">
+        <table class="orders-table" *ngIf="orders.length > 0">
+          <thead>
+            <tr>
+              <th>Client Order ID</th>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th>Status</th>
+              <th>Filled</th>
+              <th>Time</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let order of orders">
+              <td>{{ order.clOrdId }}</td>
+              <td class="symbol">{{ order.symbol }}</td>
+              <td [class]="getSideClass(order.side)">{{ getSideLabel(order.side) }}</td>
+              <td class="numeric">{{ order.quantity | number }}</td>
+              <td class="numeric">{{ order.price | number:'1.2-4' }}</td>
+              <td [class]="getStatusClass(order.status)">{{ order.status }}</td>
+              <td class="numeric">{{ order.filledQty || 0 | number }}</td>
+              <td class="time">{{ order.createdAt | date:'short' }}</td>
+              <td>
+                <button class="btn-cancel" 
+                        (click)="cancelOrder(order.clOrdId)" 
+                        *ngIf="order.status === 'NEW' || order.status === 'PARTIALLY_FILLED'">
+                  Cancel
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <div class="no-orders" *ngIf="orders.length === 0">
+          <p>No orders yet. Submit an order to send a FIX NewOrderSingle message to the Exchange.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <footer class="footer">
+    <p>FIX Trading Simulator - Broker (FIX Initiator) | Connecting to Exchange port 9876</p>
+  </footer>
+</div>

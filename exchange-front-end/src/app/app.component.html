@@ -1,0 +1,71 @@
+<div class="app-container">
+  <header class="header">
+    <h1>{{ title }}</h1>
+    <div class="session-status" *ngIf="sessionStatus">
+      <span class="status-indicator" [class.connected]="sessionStatus?.connected">
+        {{ sessionStatus?.connected ? 'Connected' : 'Disconnected' }}
+      </span>
+      <span class="session-info" *ngIf="sessionStatus?.sessionId">
+        {{ sessionStatus.sessionId }}
+      </span>
+    </div>
+  </header>
+  
+  <main class="main-content">
+    <div class="orders-section">
+      <div class="section-header">
+        <h2>Orders</h2>
+        <button class="btn-refresh" (click)="refreshOrders()">
+          ↻ Refresh
+        </button>
+      </div>
+      
+      <div class="alert alert-error" *ngIf="error">
+        {{ error }}
+      </div>
+      
+      <div class="loading" *ngIf="loading">
+        Loading orders...
+      </div>
+      
+      <div class="orders-table-container" *ngIf="!loading">
+        <table class="orders-table" *ngIf="orders.length > 0">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Client Order ID</th>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th>Status</th>
+              <th>Filled</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let order of orders">
+              <td>{{ order.orderRefNumber || order.id }}</td>
+              <td>{{ order.clOrdId }}</td>
+              <td class="symbol">{{ order.symbol }}</td>
+              <td [class]="getSideClass(order.side)">{{ getSideLabel(order.side) }}</td>
+              <td class="numeric">{{ order.quantity | number }}</td>
+              <td class="numeric">{{ order.price | number:'1.2-4' }}</td>
+              <td [class]="getStatusClass(order.status)">{{ order.status }}</td>
+              <td class="numeric">{{ order.filledQty || 0 | number }}</td>
+              <td class="time">{{ order.createdAt | date:'short' }}</td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <div class="no-orders" *ngIf="orders.length === 0">
+          <p>No orders received yet. Waiting for FIX messages from Broker...</p>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <footer class="footer">
+    <p>FIX Trading Simulator - Exchange (FIX Acceptor) | Port: 9876</p>
+  </footer>
+</div>
