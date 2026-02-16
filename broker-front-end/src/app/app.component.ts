@@ -78,23 +78,15 @@ export class AppComponent implements OnInit, OnDestroy {
   }
   
   submitOrder(): void {
-    const order: Order = {
-      id: 0,
-      orderRefNumber: '',
+    this.error = null;
+    const order: any = {
       clOrdId: 'ORD-' + Date.now(),
       symbol: this.newOrder.symbol,
       side: this.newOrder.side,
       quantity: this.newOrder.quantity,
       price: this.newOrder.price,
       orderType: this.newOrder.orderType,
-      timeInForce: this.newOrder.timeInForce,
-      status: 'NEW',
-      clientId: 'BROKER',
-      filledQty: 0,
-      leavesQty: this.newOrder.quantity,
-      avgPrice: 0,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      status: 'NEW'
     };
     
     this.orderService.createOrder(order).pipe(

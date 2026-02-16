@@ -1,202 +1,362 @@
+﻿// Professional Light Trading UI - White Theme
+$primary: #2563eb;
+$success: #16a34a;
+$danger: #dc2626;
+$warning: #d97706;
+$bg-page: #f1f5f9;
+$bg-card: #ffffff;
+$bg-header: #ffffff;
+$text-primary: #0f172a;
+$text-secondary: #64748b;
+$border-color: #e2e8f0;
+
 .app-container {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f0f2f5;
+  background: $bg-page;
+  color: $text-primary;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .header {
-  background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
-  color: white;
-  padding: 20px;
+  background: $bg-header;
+  padding: 16px 32px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-  
-  h1 {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 500;
-  }
+  border-bottom: 1px solid $border-color;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  h1 { margin: 0; font-size: 22px; font-weight: 700; color: $primary; }
 }
 
 .session-status {
   display: flex;
   align-items: center;
-  gap: 10px;
-  
+  gap: 12px;
   .status-indicator {
-    padding: 5px 12px;
+    padding: 6px 16px;
     border-radius: 20px;
     font-size: 12px;
     font-weight: 600;
-    background: #f44336;
-    
-    &.connected {
-      background: #4caf50;
-    }
+    background: #fef2f2;
+    color: $danger;
+    &.connected { background: #dcfce7; color: $success; }
   }
-  
-  .session-info {
-    font-size: 12px;
-    opacity: 0.8;
-  }
+  .session-info { font-size: 12px; color: $text-secondary; }
 }
 
 .main-content {
   flex: 1;
-  padding: 20px;
-  max-width: 1400px;
+  padding: 24px 32px;
+  max-width: 1600px;
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
 }
 
-.orders-section {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+// Market Data Section
+.market-data-section {
+  background: $bg-card;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  border: 1px solid $border-color;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  h2 { 
+    margin: 0 0 16px 0; 
+    font-size: 15px; 
+    font-weight: 600; 
+    color: $text-secondary;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    .stock-count { font-weight: 400; font-size: 12px; }
+  }
+}
+
+// Category Container
+.category-container {
+  margin-bottom: 16px;
+  border: 1px solid $border-color;
+  border-radius: 10px;
   overflow: hidden;
+  &:last-child { margin-bottom: 0; }
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+  &:hover { background: #f1f5f9; }
+  .category-icon { 
+    font-size: 10px; 
+    color: $text-secondary;
+    width: 14px;
+  }
+  .category-name { 
+    font-weight: 600; 
+    font-size: 14px; 
+    color: $text-primary;
+    flex: 1;
+  }
+  .category-count {
+    font-size: 12px;
+    color: $text-secondary;
+    background: #e2e8f0;
+    padding: 3px 10px;
+    border-radius: 12px;
+  }
+}
+
+.market-data-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  background: #fff;
+}
+
+.stock-card {
+  background: #fafbfc;
+  border: 1px solid $border-color;
+  border-radius: 10px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  &:hover { 
+    border-color: #cbd5e1; 
+    background: #f8fafc;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  &.selected { 
+    border-color: $primary; 
+    background: #eff6ff; 
+    box-shadow: 0 0 0 3px rgba($primary, 0.15);
+  }
+  .stock-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .stock-symbol { 
+    font-weight: 700; 
+    font-size: 14px; 
+    color: $text-primary;
+    letter-spacing: -0.3px;
+  }
+  .stock-change {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    &.positive { background: #dcfce7; color: $success; }
+    &.negative { background: #fee2e2; color: $danger; }
+  }
+  .stock-price { 
+    font-size: 18px; 
+    font-weight: 700; 
+    color: $text-primary; 
+    margin-bottom: 4px;
+    letter-spacing: -0.5px;
+  }
+  .stock-name {
+    font-size: 10px;
+    color: $text-secondary;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .stock-details { 
+    font-size: 10px; 
+    color: $text-secondary;
+    font-weight: 500;
+  }
+}
+
+.order-form-section {
+  background: $bg-card;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid $border-color;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  h2 { 
+    margin: 0 0 20px 0; 
+    font-size: 15px; 
+    font-weight: 600;
+    color: $text-secondary;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}
+
+.order-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    label { 
+      font-size: 11px; 
+      font-weight: 600; 
+      color: $text-secondary; 
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    input, select {
+      padding: 11px 14px;
+      border: 1px solid $border-color;
+      border-radius: 8px;
+      font-size: 14px;
+      min-width: 130px;
+      background: #fff;
+      color: $text-primary;
+      font-weight: 500;
+      &:focus { 
+        outline: none; 
+        border-color: $primary; 
+        box-shadow: 0 0 0 3px rgba($primary, 0.12);
+      }
+    }
+    select { cursor: pointer; }
+    .live-price {
+      position: absolute;
+      bottom: -18px;
+      left: 0;
+      font-size: 10px;
+      color: $success;
+      font-weight: 600;
+    }
+  }
+  .btn-submit {
+    background: $primary;
+    color: white;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.15s ease;
+    &:hover { 
+      background: darken($primary, 8%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba($primary, 0.3);
+    }
+  }
+}
+
+.orders-section {
+  background: $bg-card;
+  border-radius: 12px;
+  border: 1px solid $border-color;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 20px;
-  background: #fafafa;
-  border-bottom: 1px solid #e0e0e0;
-  
-  h2 {
-    margin: 0;
-    font-size: 18px;
-    color: #333;
+  padding: 18px 24px;
+  background: #fafbfc;
+  border-bottom: 1px solid $border-color;
+  h2 { 
+    margin: 0; 
+    font-size: 15px; 
+    font-weight: 600;
+    color: $text-secondary;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 }
 
 .btn-refresh {
-  background: #1a237e;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
+  background: $bg-card;
+  color: $primary;
+  border: 1px solid $primary;
+  padding: 8px 18px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
-  
-  &:hover {
-    background: #283593;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  &:hover { 
+    background: $primary;
+    color: white;
   }
 }
 
-.alert-error {
-  background: #ffebee;
-  color: #c62828;
-  padding: 15px 20px;
-  border-left: 4px solid #c62828;
+.alert-error { 
+  background: #fef2f2; 
+  color: $danger; 
+  padding: 14px 24px; 
+  border-left: 4px solid $danger;
+  font-weight: 500;
 }
-
-.loading {
-  padding: 40px;
-  text-align: center;
-  color: #666;
+.alert-success { 
+  background: #f0fdf4; 
+  color: $success; 
+  padding: 14px 24px; 
+  border-left: 4px solid $success;
+  font-weight: 500;
 }
+.loading { padding: 40px; text-align: center; color: $text-secondary; }
 
-.orders-table-container {
-  overflow-x: auto;
-}
-
+.orders-table-container { overflow-x: auto; }
 .orders-table {
   width: 100%;
   border-collapse: collapse;
-  
-  th, td {
-    padding: 12px 15px;
-    text-align: left;
-    border-bottom: 1px solid #e0e0e0;
+  th, td { 
+    padding: 14px 20px; 
+    text-align: left; 
+    border-bottom: 1px solid $border-color; 
   }
-  
-  th {
-    background: #f5f5f5;
-    font-weight: 600;
-    color: #555;
-    font-size: 13px;
+  th { 
+    background: #f8fafc; 
+    font-weight: 600; 
+    color: $text-secondary; 
+    font-size: 11px; 
     text-transform: uppercase;
+    letter-spacing: 0.3px;
   }
-  
-  tbody tr:hover {
-    background: #f5f5f5;
-  }
-  
-  .symbol {
-    font-weight: 600;
-    color: #333;
-  }
-  
-  .numeric {
-    text-align: right;
-    font-family: 'Roboto Mono', monospace;
-  }
-  
-  .time {
-    color: #666;
-    font-size: 13px;
-  }
+  tbody tr:hover { background: #f8fafc; }
+  .symbol { font-weight: 700; font-family: 'SF Mono', Monaco, monospace; color: $text-primary; }
+  .numeric { text-align: right; font-family: 'SF Mono', Monaco, monospace; font-weight: 500; }
+  .time { color: $text-secondary; font-size: 12px; }
 }
 
-.side-buy {
-  color: #2e7d32;
-  font-weight: 600;
-}
-
-.side-sell {
-  color: #c62828;
-  font-weight: 600;
-}
-
-.status-new {
-  color: #1565c0;
-  font-weight: 500;
-}
-
-.status-partial {
-  color: #f57c00;
-  font-weight: 500;
-}
-
-.status-filled {
-  color: #2e7d32;
-  font-weight: 500;
-}
-
-.status-canceled {
-  color: #757575;
-  font-weight: 500;
-}
-
-.status-rejected {
-  color: #c62828;
-  font-weight: 500;
-}
-
-.no-orders {
-  padding: 60px 20px;
-  text-align: center;
-  color: #666;
-  
-  p {
-    margin: 0;
-  }
+.side-buy { color: $success; font-weight: 700; }
+.side-sell { color: $danger; font-weight: 700; }
+.status-new { color: $primary; font-weight: 600; }
+.status-partial { color: $warning; font-weight: 600; }
+.status-filled { color: $success; font-weight: 600; }
+.status-canceled { color: $text-secondary; font-weight: 600; }
+.status-rejected { color: $danger; font-weight: 600; }
+.no-orders { 
+  padding: 60px 24px; 
+  text-align: center; 
+  color: $text-secondary; 
+  p { margin: 0; font-size: 14px; } 
 }
 
 .footer {
-  background: #263238;
-  color: #b0bec5;
-  padding: 15px 20px;
+  background: $bg-header;
+  color: $text-secondary;
+  padding: 16px 32px;
   text-align: center;
-  font-size: 13px;
-  
-  p {
-    margin: 0;
-  }
+  font-size: 12px;
+  border-top: 1px solid $border-color;
+  p { margin: 0; }
 }

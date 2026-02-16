@@ -12,6 +12,80 @@
   </header>
   
   <main class="main-content">
+    <!-- Market Data Panel - Categorized -->
+    <div class="market-data-section">
+      <h2>Live Market Data <span class="stock-count">({{ allStocks.length }} symbols)</span></h2>
+      
+      <div class="category-container" *ngFor="let category of stockCategories">
+        <div class="category-header" (click)="toggleCategory(category)">
+          <span class="category-icon">{{ category.expanded ? '▼' : '►' }}</span>
+          <span class="category-name">{{ category.name }}</span>
+          <span class="category-count">{{ category.stocks.length }} stocks</span>
+        </div>
+        <div class="market-data-grid" *ngIf="category.expanded">
+          <div class="stock-card" *ngFor="let stock of category.stocks" 
+               [class.selected]="newOrder.symbol === stock.symbol"
+               (click)="selectStock(stock); $event.stopPropagation()">
+            <div class="stock-header">
+              <span class="stock-symbol">{{ stock.symbol }}</span>
+              <span class="stock-change" [class.positive]="stock.change >= 0" [class.negative]="stock.change < 0">
+                {{ stock.change >= 0 ? '+' : '' }}{{ stock.changePercent | number:'1.2-2' }}%
+              </span>
+            </div>
+            <div class="stock-price">${{ stock.price | number:'1.2-2' }}</div>
+            <div class="stock-name">{{ stock.name }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Order Form -->
+    <div class="order-form-section">
+      <h2>Submit New Order</h2>
+      <div class="order-form">
+        <div class="form-group">
+          <label>SYMBOL</label>
+          <select [(ngModel)]="newOrder.symbol">
+            <optgroup *ngFor="let cat of stockCategories" [label]="cat.name">
+              <option *ngFor="let stock of cat.stocks" [value]="stock.symbol">{{ stock.symbol }} - {{ stock.name }}</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>SIDE</label>
+          <select [(ngModel)]="newOrder.side">
+            <option value="1">BUY</option>
+            <option value="2">SELL</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>QUANTITY</label>
+          <input type="number" [(ngModel)]="newOrder.quantity" min="1">
+        </div>
+        <div class="form-group">
+          <label>PRICE</label>
+          <input type="number" [(ngModel)]="newOrder.price" step="0.01" min="0.01">
+          <span class="live-price">Live: ${{ getStockPrice(newOrder.symbol) | number:'1.2-2' }}</span>
+        </div>
+        <div class="form-group">
+          <label>TYPE</label>
+          <select [(ngModel)]="newOrder.orderType">
+            <option value="LIMIT">LIMIT</option>
+            <option value="MARKET">MARKET</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>TIF</label>
+          <select [(ngModel)]="newOrder.timeInForce">
+            <option value="DAY">DAY</option>
+            <option value="GTC">GTC</option>
+            <option value="IOC">IOC</option>
+          </select>
+        </div>
+        <button class="btn-submit" (click)="submitOrder()">Submit Order</button>
+      </div>
+    </div>
+
     <div class="orders-section">
       <div class="section-header">
         <h2>Orders</h2>
@@ -22,6 +96,10 @@
       
       <div class="alert alert-error" *ngIf="error">
         {{ error }}
+      </div>
+
+      <div class="alert alert-success" *ngIf="success">
+        {{ success }}
       </div>
       
       <div class="loading" *ngIf="loading">
