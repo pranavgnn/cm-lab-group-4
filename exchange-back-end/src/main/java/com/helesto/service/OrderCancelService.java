@@ -1,20 +1,26 @@
 package com.helesto.service;
 
-import com.helesto.dao.OrderDao;
-import com.helesto.model.OrderEntity;
-import com.helesto.socket.WebSocketAggregator;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.transaction.Transactional;
-import java.time.LocalDateTime;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.helesto.dao.OrderDao;
+import com.helesto.model.OrderEntity;
+import com.helesto.socket.WebSocketAggregator;
 
 /**
  * G4-M3: Order Cancel Service with Audit Trail
@@ -182,7 +188,7 @@ public class OrderCancelService {
         OrderEntity order = orderDao.findByOrderRefNumber(orderRefNumber);
         if (order != null && "PENDING_CANCEL".equals(order.getStatus())) {
             // Revert to previous state (assumes it was NEW or PARTIALLY_FILLED)
-            int filledQty = order.getFilledQty() != null ? order.getFilledQty() : 0;
+            long filledQty = order.getFilledQty() != null ? order.getFilledQty() : 0L;
             String newStatus = filledQty > 0 ? "PARTIALLY_FILLED" : "NEW";
             order.setStatus(newStatus);
             orderDao.update(order);

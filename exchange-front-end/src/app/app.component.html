@@ -11,139 +11,273 @@
     </div>
   </header>
   
+  <!-- Dashboard Stats -->
+  <div class="dashboard-stats">
+    <div class="stat-item">
+      <div class="stat-label">Portfolio Value</div>
+      <div class="stat-value">${{ totalPortfolioValue | number:'1.2-2' }}</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Unrealized P&L</div>
+      <div class="stat-value" [class.positive]="totalUnrealizedPnL >= 0" [class.negative]="totalUnrealizedPnL < 0">
+        {{ totalUnrealizedPnL >= 0 ? '+' : '' }}${{ totalUnrealizedPnL | number:'1.2-2' }}
+      </div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Realized P&L</div>
+      <div class="stat-value" [class.positive]="totalRealizedPnL >= 0" [class.negative]="totalRealizedPnL < 0">
+        {{ totalRealizedPnL >= 0 ? '+' : '' }}${{ totalRealizedPnL | number:'1.2-2' }}
+      </div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Positions</div>
+      <div class="stat-value">{{ positions.length }}</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Open Orders</div>
+      <div class="stat-value">{{ getOpenCount() }}</div>
+    </div>
+  </div>
+  
   <main class="main-content">
     <!-- Market Data Panel - Categorized -->
-    <div class="market-data-section">
-      <h2>Live Market Data <span class="stock-count">({{ allStocks.length }} symbols)</span></h2>
+    <div class="market-data-section panel">
+      <h2>Watchlist <span class="stock-count">({{ allStocks.length }})</span></h2>
       
-      <div class="category-container" *ngFor="let category of stockCategories">
-        <div class="category-header" (click)="toggleCategory(category)">
-          <span class="category-icon">{{ category.expanded ? '▼' : '►' }}</span>
-          <span class="category-name">{{ category.name }}</span>
-          <span class="category-count">{{ category.stocks.length }} stocks</span>
-        </div>
-        <div class="market-data-grid" *ngIf="category.expanded">
-          <div class="stock-card" *ngFor="let stock of category.stocks" 
-               [class.selected]="newOrder.symbol === stock.symbol"
-               (click)="selectStock(stock); $event.stopPropagation()">
-            <div class="stock-header">
-              <span class="stock-symbol">{{ stock.symbol }}</span>
+      <div class="watchlist-search">
+        <input type="text" placeholder="Search symbols..." [(ngModel)]="searchQuery" (input)="filterStocks()">
+      </div>
+      
+      <div class="scrollable">
+        <div class="category-container" *ngFor="let category of filteredCategories">
+          <div class="category-header" (click)="toggleCategory(category)">
+            <span class="category-icon">{{ category.expanded ? '▼' : '►' }}</span>
+            <span class="category-name">{{ category.name }}</span>
+            <span class="category-count">{{ category.stocks.length }}</span>
+          </div>
+          <div class="market-data-grid" *ngIf="category.expanded">
+            <div class="stock-card" *ngFor="let stock of category.stocks" 
+                 [class.selected]="newOrder.symbol === stock.symbol"
+                 (click)="selectStock(stock); $event.stopPropagation()">
+              <div class="stock-info">
+                <span class="stock-symbol">{{ stock.symbol }}</span>
+                <span class="stock-name">{{ stock.name }}</span>
+              </div>
+              <span class="stock-price">${{ stock.price | number:'1.2-2' }}</span>
               <span class="stock-change" [class.positive]="stock.change >= 0" [class.negative]="stock.change < 0">
                 {{ stock.change >= 0 ? '+' : '' }}{{ stock.changePercent | number:'1.2-2' }}%
               </span>
             </div>
-            <div class="stock-price">${{ stock.price | number:'1.2-2' }}</div>
-            <div class="stock-name">{{ stock.name }}</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- New Order Form -->
-    <div class="order-form-section">
-      <h2>Submit New Order</h2>
-      <div class="order-form">
-        <div class="form-group">
-          <label>SYMBOL</label>
-          <select [(ngModel)]="newOrder.symbol">
-            <optgroup *ngFor="let cat of stockCategories" [label]="cat.name">
-              <option *ngFor="let stock of cat.stocks" [value]="stock.symbol">{{ stock.symbol }} - {{ stock.name }}</option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>SIDE</label>
-          <select [(ngModel)]="newOrder.side">
-            <option value="1">BUY</option>
-            <option value="2">SELL</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>QUANTITY</label>
-          <input type="number" [(ngModel)]="newOrder.quantity" min="1">
-        </div>
-        <div class="form-group">
-          <label>PRICE</label>
-          <input type="number" [(ngModel)]="newOrder.price" step="0.01" min="0.01">
-          <span class="live-price">Live: ${{ getStockPrice(newOrder.symbol) | number:'1.2-2' }}</span>
-        </div>
-        <div class="form-group">
-          <label>TYPE</label>
-          <select [(ngModel)]="newOrder.orderType">
-            <option value="LIMIT">LIMIT</option>
-            <option value="MARKET">MARKET</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>TIF</label>
-          <select [(ngModel)]="newOrder.timeInForce">
-            <option value="DAY">DAY</option>
-            <option value="GTC">GTC</option>
-            <option value="IOC">IOC</option>
-          </select>
-        </div>
-        <button class="btn-submit" (click)="submitOrder()">Submit Order</button>
-      </div>
-    </div>
-
-    <div class="orders-section">
+    <!-- Orders Table -->
+    <div class="orders-section panel">
       <div class="section-header">
-        <h2>Orders</h2>
-        <button class="btn-refresh" (click)="refreshOrders()">
-          ↻ Refresh
-        </button>
+        <h2>Order Book</h2>
+        <button class="btn-refresh" (click)="refreshOrders()">↻ Refresh</button>
       </div>
       
-      <div class="alert alert-error" *ngIf="error">
-        {{ error }}
-      </div>
-
-      <div class="alert alert-success" *ngIf="success">
-        {{ success }}
-      </div>
-      
-      <div class="loading" *ngIf="loading">
-        Loading orders...
-      </div>
+      <div class="alert alert-error" *ngIf="error">{{ error }}</div>
+      <div class="alert alert-success" *ngIf="success">{{ success }}</div>
+      <div class="loading" *ngIf="loading">Loading orders...</div>
       
       <div class="orders-table-container" *ngIf="!loading">
         <table class="orders-table" *ngIf="orders.length > 0">
           <thead>
             <tr>
               <th>Order ID</th>
-              <th>Client Order ID</th>
               <th>Symbol</th>
               <th>Side</th>
-              <th>Qty</th>
-              <th>Price</th>
+              <th class="numeric">Qty</th>
+              <th class="numeric">Price</th>
+              <th>Type</th>
               <th>Status</th>
-              <th>Filled</th>
+              <th class="numeric">Filled</th>
               <th>Time</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let order of orders">
-              <td>{{ order.orderRefNumber || order.id }}</td>
-              <td>{{ order.clOrdId }}</td>
+              <td>{{ order.orderRefNumber || order.clOrdId }}</td>
               <td class="symbol">{{ order.symbol }}</td>
               <td [class]="getSideClass(order.side)">{{ getSideLabel(order.side) }}</td>
               <td class="numeric">{{ order.quantity | number }}</td>
-              <td class="numeric">{{ order.price | number:'1.2-4' }}</td>
+              <td class="numeric">${{ order.price | number:'1.2-2' }}</td>
+              <td>{{ order.orderType || 'LIMIT' }}</td>
               <td [class]="getStatusClass(order.status)">{{ order.status }}</td>
-              <td class="numeric">{{ order.filledQty || 0 | number }}</td>
-              <td class="time">{{ order.createdAt | date:'short' }}</td>
+              <td class="numeric">{{ order.filledQty || 0 }}</td>
+              <td class="time">{{ order.createdAt | date:'HH:mm:ss' }}</td>
             </tr>
           </tbody>
         </table>
         
         <div class="no-orders" *ngIf="orders.length === 0">
-          <p>No orders received yet. Waiting for FIX messages from Broker...</p>
+          <p>No orders yet. Submit an order or wait for FIX messages from Broker.</p>
         </div>
+      </div>
+    </div>
+
+    <!-- Order Entry Panel -->
+    <div class="order-form-section panel">
+      <h2>New Order</h2>
+      
+      <div class="selected-symbol" *ngIf="getSelectedStock()">
+        <div class="symbol-header">
+          <span class="symbol-name">{{ getSelectedStock()?.symbol }}</span>
+          <span class="symbol-price">${{ getSelectedStock()?.price | number:'1.2-2' }}</span>
+        </div>
+        <div class="symbol-stats">
+          <span><span class="label">Bid:</span> ${{ getSelectedStock()?.bid | number:'1.2-2' }}</span>
+          <span><span class="label">Ask:</span> ${{ getSelectedStock()?.ask | number:'1.2-2' }}</span>
+        </div>
+      </div>
+      
+      <div class="order-form">
+        <div class="side-selector">
+          <button [class.active-buy]="newOrder.side === '1'" (click)="newOrder.side = '1'">BUY</button>
+          <button [class.active-sell]="newOrder.side === '2'" (click)="newOrder.side = '2'">SELL</button>
+        </div>
+        
+        <div class="form-group">
+          <label>Symbol</label>
+          <select [(ngModel)]="newOrder.symbol" (change)="onSymbolChange()">
+            <optgroup *ngFor="let cat of stockCategories" [label]="cat.name">
+              <option *ngFor="let stock of cat.stocks" [value]="stock.symbol">{{ stock.symbol }}</option>
+            </optgroup>
+          </select>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Quantity</label>
+            <input type="number" [(ngModel)]="newOrder.quantity" min="1">
+          </div>
+          <div class="form-group">
+            <label>Price</label>
+            <input type="number" [(ngModel)]="newOrder.price" step="0.01" min="0.01">
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Order Type</label>
+            <select [(ngModel)]="newOrder.orderType">
+              <option value="LIMIT">LIMIT</option>
+              <option value="MARKET">MARKET</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Time in Force</label>
+            <select [(ngModel)]="newOrder.timeInForce">
+              <option value="DAY">DAY</option>
+              <option value="GTC">GTC</option>
+              <option value="IOC">IOC</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="order-summary">
+          <div class="summary-row">
+            <span class="label">Side</span>
+            <span class="value" [style.color]="newOrder.side === '1' ? '#3fb950' : '#f85149'">{{ newOrder.side === '1' ? 'BUY' : 'SELL' }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="label">Quantity</span>
+            <span class="value">{{ newOrder.quantity | number }}</span>
+          </div>
+          <div class="summary-row total">
+            <span class="label">Est. Value</span>
+            <span class="value">${{ (newOrder.quantity * newOrder.price) | number:'1.2-2' }}</span>
+          </div>
+        </div>
+        
+        <button class="btn-submit" [class.buy]="newOrder.side === '1'" [class.sell]="newOrder.side === '2'" (click)="submitOrder()">
+          {{ newOrder.side === '1' ? 'BUY' : 'SELL' }} {{ newOrder.symbol }}
+        </button>
       </div>
     </div>
   </main>
   
+  <!-- Positions Section -->
+  <section class="positions-section" *ngIf="positions.length > 0">
+    <div class="panel">
+      <h2>Positions</h2>
+      <table class="positions-table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th class="numeric">Qty</th>
+            <th class="numeric">Avg Price</th>
+            <th class="numeric">Current</th>
+            <th class="numeric">Market Value</th>
+            <th class="numeric">Unrealized P&L</th>
+            <th class="numeric">%</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let pos of positions">
+            <td class="symbol">{{ pos.symbol }}</td>
+            <td class="numeric">{{ pos.quantity | number }}</td>
+            <td class="numeric">${{ pos.avgPrice | number:'1.2-2' }}</td>
+            <td class="numeric">${{ pos.currentPrice | number:'1.2-2' }}</td>
+            <td class="numeric">${{ pos.marketValue | number:'1.2-2' }}</td>
+            <td class="numeric" [class.positive]="pos.unrealizedPnL >= 0" [class.negative]="pos.unrealizedPnL < 0">
+              {{ pos.unrealizedPnL >= 0 ? '+' : '' }}${{ pos.unrealizedPnL | number:'1.2-2' }}
+            </td>
+            <td class="numeric" [class.positive]="pos.unrealizedPnLPercent >= 0" [class.negative]="pos.unrealizedPnLPercent < 0">
+              {{ pos.unrealizedPnLPercent >= 0 ? '+' : '' }}{{ pos.unrealizedPnLPercent | number:'1.2-2' }}%
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="totals-row">
+            <td colspan="4">Total</td>
+            <td class="numeric">${{ totalPortfolioValue | number:'1.2-2' }}</td>
+            <td class="numeric" [class.positive]="totalUnrealizedPnL >= 0" [class.negative]="totalUnrealizedPnL < 0">
+              {{ totalUnrealizedPnL >= 0 ? '+' : '' }}${{ totalUnrealizedPnL | number:'1.2-2' }}
+            </td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+  
+  <!-- Trade Blotter -->
+  <section class="blotter-section" *ngIf="executions.length > 0">
+    <div class="panel">
+      <h2>Recent Executions</h2>
+      <table class="blotter-table">
+        <thead>
+          <tr>
+            <th>Exec ID</th>
+            <th>Time</th>
+            <th>Symbol</th>
+            <th>Side</th>
+            <th class="numeric">Qty</th>
+            <th class="numeric">Price</th>
+            <th class="numeric">Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let exec of executions">
+            <td>{{ exec.execId }}</td>
+            <td class="time">{{ exec.time | date:'HH:mm:ss' }}</td>
+            <td class="symbol">{{ exec.symbol }}</td>
+            <td [class]="getSideClass(exec.side)">{{ getSideLabel(exec.side) }}</td>
+            <td class="numeric">{{ exec.quantity | number }}</td>
+            <td class="numeric">${{ exec.price | number:'1.2-2' }}</td>
+            <td class="numeric">${{ exec.quantity * exec.price | number:'1.2-2' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  
   <footer class="footer">
-    <p>FIX Trading Simulator - Exchange (FIX Acceptor) | Port: 9876</p>
+    <p>Exchange Trading Platform (FIX Acceptor) | Port 9876 | {{ allStocks.length }} Securities</p>
   </footer>
 </div>

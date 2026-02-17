@@ -1,8 +1,29 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { OrderService } from './services/order.service';
 import { Order, SessionInfo } from './models/order.model';
 import { Subscription, interval, of } from 'rxjs';
 import { switchMap, catchError } from 'rxjs/operators';
+
+interface MarketData {
+  symbol: string;
+  lastPrice: number;
+  bid: number;
+  ask: number;
+  volume: number;
+  change: number;
+  changePercent: number;
+}
+
+interface Position {
+  symbol: string;
+  quantity: number;
+  avgPrice: number;
+  currentPrice: number;
+  marketValue: number;
+  unrealizedPnL: number;
+  unrealizedPnLPercent: number;
+}
 
 @Component({
   selector: 'app-root',
@@ -16,30 +37,68 @@ export class AppComponent implements OnInit, OnDestroy {
   loading = false;
   error: string | null = null;
   
+  // Market data from exchange
+  marketData: MarketData[] = [];
+  
+  // Position tracking
+  positions: Position[] = [];
+  totalPortfolioValue = 0;
+  totalUnrealizedPnL = 0;
+  
+  // Quick trade symbols
+  quickSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA'];
+  allSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'AMD', 'INTC', 'NFLX', 
+                'JPM', 'BAC', 'GS', 'V', 'MA', 'JNJ', 'PFE', 'UNH', 'XOM', 'CVX'];
+  
   // New order form
   newOrder = {
     symbol: 'AAPL',
     side: '1',
     quantity: 100,
-    price: 150.00,
+    price: 178.50,
     orderType: 'LIMIT',
     timeInForce: 'DAY'
   };
   
   private pollingSubscription?: Subscription;
+  private marketDataSubscription?: Subscription;
   
-  constructor(private orderService: OrderService) {}
+  constructor(private orderService: OrderService, private http: HttpClient) {}
   
   ngOnInit(): void {
     this.loadOrders();
     this.loadSessionInfo();
+    this.loadMarketData();
     this.startPolling();
+    this.startMarketDataPolling();
   }
   
   ngOnDestroy(): void {
     if (this.pollingSubscription) {
       this.pollingSubscription.unsubscribe();
     }
+    if (this.marketDataSubscription) {
+      this.marketDataSubscription.unsubscribe();
+    }
+  }
+  
+  loadMarketData(): void {
+    // Load market data from exchange backend
+    this.http.get<MarketData[]>('http://localhost:8090/api/marketdata').pipe(
+      catchError(() => of([]))
+    ).subscribe(data => {
+      this.marketData = data.slice(0, 20); // Show top 20 in ticker
+    });
+  }
+  
+  startMarketDataPolling(): void {
+    this.marketDataSubscription = interval(5000).pipe(
+      switchMap(() => this.http.get<MarketData[]>('http://localhost:8090/api/marketdata').pipe(
+        catchError(() => of([]))
+      ))
+    ).subscribe(data => {
+      this.marketData = data.slice(0, 20);
+    });
   }
   
   loadOrders(): void {
@@ -53,6 +112,7 @@ export class AppComponent implements OnInit, OnDestroy {
     ).subscribe(orders => {
       this.orders = orders;
       this.loading = false;
+      this.calculatePositions();
     });
   }
   
@@ -74,6 +134,7 @@ export class AppComponent implements OnInit, OnDestroy {
       ))
     ).subscribe(orders => {
       this.orders = orders;
+      this.calculatePositions();
     });
   }
   
@@ -156,5 +217,76 @@ export class AppComponent implements OnInit, OnDestroy {
   refreshOrders(): void {
     this.loadOrders();
     this.loadSessionInfo();
+  }
+  
+  calculatePositions(): void {
+    const positionMap = new Map<string, { qty: number; totalCost: number }>();
+    
+    // Process filled orders
+    const filledOrders = this.orders.filter(o => 
+      o.status?.toUpperCase() === 'FILLED' || o.status?.toUpperCase() === 'PARTIALLY_FILLED'
+    );
+    
+    filledOrders.forEach(order => {
+      const symbol = order.symbol;
+      const qty = order.filledQty || order.quantity;
+      const price = order.price;
+      const isBuy = order.side === '1';
+      
+      if (!positionMap.has(symbol)) {
+        positionMap.set(symbol, { qty: 0, totalCost: 0 });
+      }
+      
+      const pos = positionMap.get(symbol)!;
+      
+      if (isBuy) {
+        pos.qty += qty;
+        pos.totalCost += qty * price;
+      } else {
+        const avgCost = pos.qty > 0 ? pos.totalCost / pos.qty : 0;
+        const sellQty = Math.min(qty, pos.qty);
+        pos.totalCost -= sellQty * avgCost;
+        pos.qty -= sellQty;
+      }
+    });
+    
+    // Convert to Position array
+    this.positions = [];
+    this.totalPortfolioValue = 0;
+    this.totalUnrealizedPnL = 0;
+    
+    positionMap.forEach((pos, symbol) => {
+      if (pos.qty > 0) {
+        const md = this.marketData.find(m => m.symbol === symbol);
+        const currentPrice = md?.lastPrice || pos.totalCost / pos.qty;
+        const avgPrice = pos.totalCost / pos.qty;
+        const marketValue = pos.qty * currentPrice;
+        const unrealizedPnL = (currentPrice - avgPrice) * pos.qty;
+        const unrealizedPnLPercent = avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice) * 100 : 0;
+        
+        this.positions.push({
+          symbol,
+          quantity: pos.qty,
+          avgPrice,
+          currentPrice,
+          marketValue,
+          unrealizedPnL,
+          unrealizedPnLPercent
+        });
+        
+        this.totalPortfolioValue += marketValue;
+        this.totalUnrealizedPnL += unrealizedPnL;
+      }
+    });
+    
+    this.positions.sort((a, b) => b.marketValue - a.marketValue);
+  }
+  
+  getFilledCount(): number {
+    return this.orders.filter(o => o.status?.toUpperCase() === 'FILLED').length;
+  }
+  
+  getOpenCount(): number {
+    return this.orders.filter(o => ['NEW', 'PARTIALLY_FILLED'].includes(o.status?.toUpperCase() || '')).length;
   }
 }

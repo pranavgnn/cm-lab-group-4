@@ -1,14 +1,25 @@
 package com.helesto.rest;
 
-import com.helesto.dao.OrderDao;
-import com.helesto.model.OrderEntity;
-import com.helesto.service.*;
+import java.util.Map;
+import java.util.UUID;
 
 import javax.inject.Inject;
-import javax.ws.rs.*;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.util.*;
+
+import com.helesto.dao.OrderDao;
+import com.helesto.model.OrderEntity;
+import com.helesto.service.MatchingEngine;
+import com.helesto.service.OrderBookManager;
+import com.helesto.service.OrderCancelService;
+import com.helesto.service.OrderValidationService;
+import com.helesto.service.TradeService;
 
 /**
  * REST endpoints for Order Management and Cancel operations
@@ -41,6 +52,12 @@ public class OrderManagementRest {
     @GET
     public Response getAllOrders() {
         return Response.ok(orderDao.findAll()).build();
+    }
+    
+    @POST
+    public Response createOrder(OrderSubmitRequest request) {
+        // Reuse submit logic
+        return submitOrder(request);
     }
     
     @GET
@@ -138,14 +155,22 @@ public class OrderManagementRest {
                     .build();
         }
         
+        // Convert order type codes to names
+        String orderType = convertOrderType(request.orderType);
+        String timeInForce = convertTimeInForce(request.timeInForce);
+        String side = request.side;
+        // Convert side if specified as BUY/SELL
+        if ("BUY".equalsIgnoreCase(side)) side = "1";
+        else if ("SELL".equalsIgnoreCase(side)) side = "2";
+        
         // Create order entity
         OrderEntity order = new OrderEntity();
         order.setSymbol(request.symbol);
-        order.setSide(request.side);
+        order.setSide(side);
         order.setQuantity((long) request.quantity);
         order.setPrice(request.price);
-        order.setOrderType(request.orderType != null ? request.orderType : "2"); // LIMIT default
-        order.setTimeInForce(request.timeInForce != null ? request.timeInForce : "0"); // DAY default
+        order.setOrderType(orderType);
+        order.setTimeInForce(timeInForce);
         order.setClientId(request.clientId != null ? request.clientId : "CLIENT001");
         order.setClOrdId(request.clOrdId != null ? request.clOrdId : UUID.randomUUID().toString());
         
@@ -208,6 +233,31 @@ public class OrderManagementRest {
                         "fills", matchResult.fills.size(),
                         "addedToBook", matchResult.addedToBook
                 )).build();
+    }
+    
+    // ================== Helper Methods ==================
+    
+    private String convertOrderType(String type) {
+        if (type == null) return "LIMIT";
+        switch (type.toUpperCase()) {
+            case "1": case "MARKET": return "MARKET";
+            case "2": case "LIMIT": return "LIMIT";
+            case "3": case "STOP": return "STOP";
+            case "4": case "STOP_LIMIT": return "STOP_LIMIT";
+            default: return type.toUpperCase();
+        }
+    }
+    
+    private String convertTimeInForce(String tif) {
+        if (tif == null) return "DAY";
+        switch (tif.toUpperCase()) {
+            case "0": case "DAY": return "DAY";
+            case "1": case "GTC": return "GTC";
+            case "3": case "IOC": return "IOC";
+            case "4": case "FOK": return "FOK";
+            case "6": case "GTD": return "GTD";
+            default: return tif.toUpperCase();
+        }
     }
     
     // ================== Request Classes ==================

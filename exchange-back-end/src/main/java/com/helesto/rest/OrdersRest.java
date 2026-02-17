@@ -1,6 +1,5 @@
 package com.helesto.rest;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import javax.inject.Inject;
@@ -22,7 +21,7 @@ import org.slf4j.LoggerFactory;
 import com.helesto.dao.OrderDao;
 import com.helesto.model.OrderEntity;
 
-@Path("/orders")
+@Path("/api/orders-legacy")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class OrdersRest {

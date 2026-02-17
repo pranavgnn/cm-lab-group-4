@@ -3,17 +3,12 @@
     "target": "http://localhost:8090",
     "secure": false,
     "logLevel": "debug",
-    "pathRewrite": {
-      "^/api": ""
-    },
     "changeOrigin": true
   },
-  "/socket/*": {
+  "/ws/*": {
     "target": "ws://localhost:8090",
     "secure": false,
     "ws": true,
-    "pathRewrite": {
-      "^/socket": ""
-    }
+    "changeOrigin": true
   }
 }

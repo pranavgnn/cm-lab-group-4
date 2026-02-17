@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import com.helesto.core.Exchange;
 
-@Path("/session")
+@Path("/api/session")
 @Produces(MediaType.APPLICATION_JSON)
 public class SessionRest {
 
@@ -24,13 +24,17 @@ public class SessionRest {
     Exchange exchange;
 
     public static class SessionStatus {
+        public boolean connected;
         public boolean isAccepting;
+        public String sessionId;
         public String acceptorPort;
         public int messagesSent;
         public int messagesReceived;
 
-        public SessionStatus(boolean isAccepting, String acceptorPort, int messagesSent, int messagesReceived) {
+        public SessionStatus(boolean connected, boolean isAccepting, String sessionId, String acceptorPort, int messagesSent, int messagesReceived) {
+            this.connected = connected;
             this.isAccepting = isAccepting;
+            this.sessionId = sessionId;
             this.acceptorPort = acceptorPort;
             this.messagesSent = messagesSent;
             this.messagesReceived = messagesReceived;
@@ -44,6 +48,8 @@ public class SessionRest {
         LOG.info("GET /session");
         return new SessionStatus(
                 true,
+                true,
+                "EXCHANGE->BROKER",
                 "9876",
                 0, // TODO: Get actual message counts
                 0

@@ -13,9 +13,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.helesto.core.Trader;
+
 import quickfix.ConfigError;
 
-@Path("/session")
+@Path("/api/session")
 @Produces(MediaType.APPLICATION_JSON)
 public class SessionRest {
 

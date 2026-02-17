@@ -1,7 +1,8 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { OrderService } from './services/order.service';
 import { Order, SessionStatus } from './models/order.model';
-import { Subscription, interval, of } from 'rxjs';
+import { Subscription, interval, of, forkJoin } from 'rxjs';
 import { switchMap, catchError } from 'rxjs/operators';
 
 interface StockQuote {
@@ -9,6 +10,8 @@ interface StockQuote {
   name: string;
   sector: string;
   price: number;
+  bid: number;
+  ask: number;
   change: number;
   changePercent: number;
   volume: number;
@@ -18,6 +21,44 @@ interface StockCategory {
   name: string;
   stocks: StockQuote[];
   expanded: boolean;
+}
+
+interface Security {
+  symbol: string;
+  name: string;
+  sector: string;
+  securityType: string;
+}
+
+interface MarketData {
+  symbol: string;
+  lastPrice: number;
+  bid: number;
+  ask: number;
+  volume: number;
+  change: number;
+  changePercent: number;
+}
+
+interface Position {
+  symbol: string;
+  quantity: number;
+  avgPrice: number;
+  currentPrice: number;
+  marketValue: number;
+  unrealizedPnL: number;
+  unrealizedPnLPercent: number;
+  realizedPnL: number;
+}
+
+interface Execution {
+  execId: string;
+  symbol: string;
+  side: string;
+  quantity: number;
+  price: number;
+  time: Date;
+  orderId: string;
 }
 
 @Component({
@@ -35,75 +76,21 @@ export class AppComponent implements OnInit, OnDestroy {
   
   // Market Data - Categorized
   stockCategories: StockCategory[] = [];
+  filteredCategories: StockCategory[] = [];
   allStocks: StockQuote[] = [];
+  securities: Security[] = [];
+  searchQuery = '';
   
-  private baseStocks = [
-    // Technology
-    { symbol: 'AAPL', name: 'Apple Inc.', sector: 'Technology', basePrice: 178.50 },
-    { symbol: 'MSFT', name: 'Microsoft Corp.', sector: 'Technology', basePrice: 378.90 },
-    { symbol: 'GOOGL', name: 'Alphabet Inc.', sector: 'Technology', basePrice: 141.80 },
-    { symbol: 'NVDA', name: 'NVIDIA Corp.', sector: 'Technology', basePrice: 721.30 },
-    { symbol: 'META', name: 'Meta Platforms', sector: 'Technology', basePrice: 485.20 },
-    { symbol: 'INTC', name: 'Intel Corp.', sector: 'Technology', basePrice: 43.20 },
-    { symbol: 'AMD', name: 'AMD Inc.', sector: 'Technology', basePrice: 165.40 },
-    { symbol: 'CRM', name: 'Salesforce Inc.', sector: 'Technology', basePrice: 278.30 },
-    { symbol: 'ORCL', name: 'Oracle Corp.', sector: 'Technology', basePrice: 125.60 },
-    { symbol: 'CSCO', name: 'Cisco Systems', sector: 'Technology', basePrice: 48.90 },
-    { symbol: 'ADBE', name: 'Adobe Inc.', sector: 'Technology', basePrice: 548.20 },
-    { symbol: 'IBM', name: 'IBM Corp.', sector: 'Technology', basePrice: 168.40 },
-    // Consumer
-    { symbol: 'AMZN', name: 'Amazon.com Inc.', sector: 'Consumer', basePrice: 178.25 },
-    { symbol: 'TSLA', name: 'Tesla Inc.', sector: 'Consumer', basePrice: 201.45 },
-    { symbol: 'WMT', name: 'Walmart Inc.', sector: 'Consumer', basePrice: 165.30 },
-    { symbol: 'HD', name: 'Home Depot', sector: 'Consumer', basePrice: 358.90 },
-    { symbol: 'NKE', name: 'Nike Inc.', sector: 'Consumer', basePrice: 98.40 },
-    { symbol: 'MCD', name: 'McDonald\'s Corp.', sector: 'Consumer', basePrice: 294.50 },
-    { symbol: 'SBUX', name: 'Starbucks Corp.', sector: 'Consumer', basePrice: 92.30 },
-    { symbol: 'TGT', name: 'Target Corp.', sector: 'Consumer', basePrice: 142.80 },
-    { symbol: 'COST', name: 'Costco Wholesale', sector: 'Consumer', basePrice: 728.40 },
-    // Entertainment
-    { symbol: 'DIS', name: 'Walt Disney', sector: 'Entertainment', basePrice: 112.50 },
-    { symbol: 'NFLX', name: 'Netflix Inc.', sector: 'Entertainment', basePrice: 605.80 },
-    { symbol: 'SPOT', name: 'Spotify Tech', sector: 'Entertainment', basePrice: 298.70 },
-    { symbol: 'WBD', name: 'Warner Bros.', sector: 'Entertainment', basePrice: 11.20 },
-    { symbol: 'PARA', name: 'Paramount Global', sector: 'Entertainment', basePrice: 12.80 },
-    // Finance
-    { symbol: 'JPM', name: 'JPMorgan Chase', sector: 'Finance', basePrice: 195.20 },
-    { symbol: 'V', name: 'Visa Inc.', sector: 'Finance', basePrice: 278.60 },
-    { symbol: 'MA', name: 'Mastercard Inc.', sector: 'Finance', basePrice: 456.70 },
-    { symbol: 'BAC', name: 'Bank of America', sector: 'Finance', basePrice: 35.40 },
-    { symbol: 'GS', name: 'Goldman Sachs', sector: 'Finance', basePrice: 468.90 },
-    { symbol: 'MS', name: 'Morgan Stanley', sector: 'Finance', basePrice: 94.20 },
-    { symbol: 'BLK', name: 'BlackRock Inc.', sector: 'Finance', basePrice: 824.50 },
-    { symbol: 'AXP', name: 'American Express', sector: 'Finance', basePrice: 224.30 },
-    { symbol: 'BRK.B', name: 'Berkshire Hathaway', sector: 'Finance', basePrice: 408.50 },
-    // Healthcare
-    { symbol: 'JNJ', name: 'Johnson & Johnson', sector: 'Healthcare', basePrice: 156.80 },
-    { symbol: 'UNH', name: 'UnitedHealth', sector: 'Healthcare', basePrice: 528.40 },
-    { symbol: 'PFE', name: 'Pfizer Inc.', sector: 'Healthcare', basePrice: 27.30 },
-    { symbol: 'MRK', name: 'Merck & Co.', sector: 'Healthcare', basePrice: 128.50 },
-    { symbol: 'ABBV', name: 'AbbVie Inc.', sector: 'Healthcare', basePrice: 172.80 },
-    { symbol: 'LLY', name: 'Eli Lilly', sector: 'Healthcare', basePrice: 782.40 },
-    { symbol: 'TMO', name: 'Thermo Fisher', sector: 'Healthcare', basePrice: 568.30 },
-    // Consumer Staples
-    { symbol: 'PG', name: 'Procter & Gamble', sector: 'Consumer Staples', basePrice: 162.40 },
-    { symbol: 'KO', name: 'Coca-Cola Co.', sector: 'Consumer Staples', basePrice: 61.80 },
-    { symbol: 'PEP', name: 'PepsiCo Inc.', sector: 'Consumer Staples', basePrice: 172.30 },
-    { symbol: 'PM', name: 'Philip Morris', sector: 'Consumer Staples', basePrice: 118.90 },
-    { symbol: 'CL', name: 'Colgate-Palmolive', sector: 'Consumer Staples', basePrice: 92.40 },
-    // Industrial
-    { symbol: 'BA', name: 'Boeing Co.', sector: 'Industrial', basePrice: 178.60 },
-    { symbol: 'CAT', name: 'Caterpillar Inc.', sector: 'Industrial', basePrice: 342.80 },
-    { symbol: 'GE', name: 'General Electric', sector: 'Industrial', basePrice: 168.50 },
-    { symbol: 'HON', name: 'Honeywell', sector: 'Industrial', basePrice: 208.30 },
-    { symbol: 'UPS', name: 'United Parcel', sector: 'Industrial', basePrice: 148.70 },
-    { symbol: 'RTX', name: 'RTX Corp.', sector: 'Industrial', basePrice: 112.40 },
-    // Energy
-    { symbol: 'XOM', name: 'Exxon Mobil', sector: 'Energy', basePrice: 108.40 },
-    { symbol: 'CVX', name: 'Chevron Corp.', sector: 'Energy', basePrice: 152.80 },
-    { symbol: 'COP', name: 'ConocoPhillips', sector: 'Energy', basePrice: 118.60 },
-    { symbol: 'SLB', name: 'Schlumberger', sector: 'Energy', basePrice: 48.90 },
-  ];
+  // Position Tracking
+  positions: Position[] = [];
+  totalPortfolioValue = 0;
+  totalUnrealizedPnL = 0;
+  totalRealizedPnL = 0;
+  
+  // Trade History Blotter
+  executions: Execution[] = [];
+  
+  private basePrices: Map<string, number> = new Map();
   
   // New order form
   newOrder = {
@@ -118,14 +105,14 @@ export class AppComponent implements OnInit, OnDestroy {
   private pollingSubscription?: Subscription;
   private marketDataSubscription?: Subscription;
   
-  constructor(private orderService: OrderService) {}
+  constructor(private orderService: OrderService, private http: HttpClient) {}
   
   ngOnInit(): void {
-    this.initializeMarketData();
+    this.loadMarketData();
     this.loadOrders();
     this.loadSessionStatus();
     this.startPolling();
-    this.startMarketDataSimulation();
+    this.startMarketDataPolling();
   }
   
   ngOnDestroy(): void {
@@ -137,49 +124,135 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
   
-  initializeMarketData(): void {
-    // Initialize all stocks
-    this.allStocks = this.baseStocks.map(s => {
-      const change = (Math.random() - 0.5) * 4;
-      return {
-        symbol: s.symbol,
-        name: s.name,
-        sector: s.sector,
-        price: s.basePrice,
-        change: change,
-        changePercent: (change / s.basePrice) * 100,
-        volume: Math.floor(Math.random() * 50000000) + 1000000
-      };
-    });
-    
-    // Group by sector
-    const sectors = [...new Set(this.baseStocks.map(s => s.sector))];
-    this.stockCategories = sectors.map(sector => ({
-      name: sector,
-      stocks: this.allStocks.filter(s => s.sector === sector),
-      expanded: sector === 'Technology' // Tech expanded by default
-    }));
-  }
-  
-  startMarketDataSimulation(): void {
-    this.marketDataSubscription = interval(1500).subscribe(() => {
-      this.allStocks = this.allStocks.map(stock => {
-        const priceChange = (Math.random() - 0.5) * (stock.price * 0.003);
-        const newPrice = Math.max(0.01, stock.price + priceChange);
-        const newChange = stock.change + priceChange;
+  loadMarketData(): void {
+    // Load both securities and market data from API
+    forkJoin({
+      securities: this.http.get<Security[]>('/api/securities').pipe(catchError(() => of([]))),
+      marketData: this.http.get<MarketData[]>('/api/marketdata').pipe(catchError(() => of([])))
+    }).subscribe(({ securities, marketData }) => {
+      this.securities = securities.filter(s => s.securityType === 'EQUITY');
+      
+      // Create a map of market data
+      const mdMap = new Map<string, MarketData>();
+      marketData.forEach(md => mdMap.set(md.symbol, md));
+      
+      // Convert to StockQuote format
+      this.allStocks = this.securities.map(s => {
+        const md = mdMap.get(s.symbol);
+        const basePrice = md?.lastPrice || 100;
+        this.basePrices.set(s.symbol, basePrice);
+        
         return {
-          ...stock,
-          price: newPrice,
-          change: newChange,
-          changePercent: (newChange / (newPrice - newChange)) * 100,
-          volume: stock.volume + Math.floor(Math.random() * 10000)
+          symbol: s.symbol,
+          name: s.name,
+          sector: s.sector,
+          price: md?.lastPrice || basePrice,
+          bid: md?.bid || basePrice - 0.05,
+          ask: md?.ask || basePrice + 0.05,
+          change: md?.change || 0,
+          changePercent: md?.changePercent || 0,
+          volume: md?.volume || 0
         };
       });
+      
+      this.organizeByCategory();
+      
+      // Set initial price for order form
+      if (this.allStocks.length > 0) {
+        const aapl = this.allStocks.find(s => s.symbol === 'AAPL');
+        if (aapl) {
+          this.newOrder.price = Math.round(aapl.price * 100) / 100;
+        }
+      }
+    });
+  }
+  
+  startMarketDataPolling(): void {
+    this.marketDataSubscription = interval(2000).pipe(
+      switchMap(() => this.http.get<MarketData[]>('/api/marketdata').pipe(catchError(() => of([]))))
+    ).subscribe(marketData => {
+      const mdMap = new Map<string, MarketData>();
+      marketData.forEach(md => mdMap.set(md.symbol, md));
+      
+      // Update stocks with new prices
+      this.allStocks = this.allStocks.map(stock => {
+        const md = mdMap.get(stock.symbol);
+        if (md) {
+          return {
+            ...stock,
+            price: md.lastPrice,
+            bid: md.bid,
+            ask: md.ask,
+            change: md.change,
+            changePercent: md.changePercent,
+            volume: md.volume
+          };
+        }
+        return stock;
+      });
+      
       // Update categories
       this.stockCategories.forEach(cat => {
         cat.stocks = this.allStocks.filter(s => s.sector === cat.name);
       });
     });
+  }
+  
+  organizeByCategory(): void {
+    const sectors = [...new Set(this.allStocks.map(s => s.sector))];
+    this.stockCategories = sectors.map(sector => ({
+      name: sector,
+      stocks: this.allStocks.filter(s => s.sector === sector),
+      expanded: sector === 'TECHNOLOGY' || sector === 'Technology'
+    }));
+    
+    // Expand first category if none are expanded
+    if (this.stockCategories.length > 0 && !this.stockCategories.some(c => c.expanded)) {
+      this.stockCategories[0].expanded = true;
+    }
+    
+    this.filteredCategories = [...this.stockCategories];
+  }
+  
+  filterStocks(): void {
+    if (!this.searchQuery.trim()) {
+      this.filteredCategories = [...this.stockCategories];
+      return;
+    }
+    const query = this.searchQuery.toLowerCase();
+    this.filteredCategories = this.stockCategories
+      .map(cat => ({
+        ...cat,
+        stocks: cat.stocks.filter(s => 
+          s.symbol.toLowerCase().includes(query) || 
+          s.name.toLowerCase().includes(query)
+        ),
+        expanded: true
+      }))
+      .filter(cat => cat.stocks.length > 0);
+  }
+  
+  getSelectedStock(): StockQuote | undefined {
+    return this.allStocks.find(s => s.symbol === this.newOrder.symbol);
+  }
+  
+  onSymbolChange(): void {
+    const stock = this.getSelectedStock();
+    if (stock) {
+      this.newOrder.price = Math.round(stock.price * 100) / 100;
+    }
+  }
+  
+  getTotalVolume(): number {
+    return this.allStocks.reduce((sum, s) => sum + (s.volume || 0), 0);
+  }
+  
+  getFilledCount(): number {
+    return this.orders.filter(o => o.status?.toUpperCase() === 'FILLED').length;
+  }
+  
+  getOpenCount(): number {
+    return this.orders.filter(o => ['NEW', 'PARTIALLY_FILLED'].includes(o.status?.toUpperCase() || '')).length;
   }
   
   toggleCategory(category: StockCategory): void {
@@ -207,6 +280,7 @@ export class AppComponent implements OnInit, OnDestroy {
     ).subscribe(orders => {
       this.orders = orders;
       this.loading = false;
+      this.calculatePositions();
     });
   }
   
@@ -228,6 +302,7 @@ export class AppComponent implements OnInit, OnDestroy {
       ))
     ).subscribe(orders => {
       this.orders = orders;
+      this.calculatePositions();
     });
   }
   
@@ -265,6 +340,7 @@ export class AppComponent implements OnInit, OnDestroy {
       quantity: this.newOrder.quantity,
       price: this.newOrder.price,
       orderType: this.newOrder.orderType,
+      timeInForce: this.newOrder.timeInForce,
       status: 'NEW'
     };
     
@@ -279,5 +355,108 @@ export class AppComponent implements OnInit, OnDestroy {
         this.loadOrders();
       }
     });
+  }
+  
+  cancelOrder(clOrdId: string): void {
+    this.orderService.cancelOrder(clOrdId).pipe(
+      catchError(err => {
+        this.error = 'Failed to cancel order: ' + (err.message || 'Unknown error');
+        return of(null);
+      })
+    ).subscribe(() => {
+      this.loadOrders();
+    });
+  }
+  
+  // Position Tracking Methods
+  calculatePositions(): void {
+    const positionMap = new Map<string, { qty: number; totalCost: number; realizedPnL: number }>();
+    
+    // Process filled orders to calculate positions
+    const filledOrders = this.orders.filter(o => 
+      o.status?.toUpperCase() === 'FILLED' || o.status?.toUpperCase() === 'PARTIALLY_FILLED'
+    );
+    
+    filledOrders.forEach(order => {
+      const symbol = order.symbol;
+      const qty = order.filledQty || order.quantity;
+      const price = order.price;
+      const isBuy = order.side === '1';
+      
+      if (!positionMap.has(symbol)) {
+        positionMap.set(symbol, { qty: 0, totalCost: 0, realizedPnL: 0 });
+      }
+      
+      const pos = positionMap.get(symbol)!;
+      
+      if (isBuy) {
+        pos.qty += qty;
+        pos.totalCost += qty * price;
+      } else {
+        // Sell - realize P&L
+        if (pos.qty > 0) {
+          const avgCost = pos.totalCost / pos.qty;
+          const sellQty = Math.min(qty, pos.qty);
+          pos.realizedPnL += sellQty * (price - avgCost);
+          pos.totalCost -= sellQty * avgCost;
+          pos.qty -= sellQty;
+        }
+      }
+    });
+    
+    // Convert to Position array with current prices
+    this.positions = [];
+    this.totalPortfolioValue = 0;
+    this.totalUnrealizedPnL = 0;
+    this.totalRealizedPnL = 0;
+    
+    positionMap.forEach((pos, symbol) => {
+      if (pos.qty > 0) {
+        const stock = this.allStocks.find(s => s.symbol === symbol);
+        const currentPrice = stock?.price || this.basePrices.get(symbol) || 0;
+        const avgPrice = pos.totalCost / pos.qty;
+        const marketValue = pos.qty * currentPrice;
+        const unrealizedPnL = (currentPrice - avgPrice) * pos.qty;
+        const unrealizedPnLPercent = avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice) * 100 : 0;
+        
+        this.positions.push({
+          symbol,
+          quantity: pos.qty,
+          avgPrice,
+          currentPrice,
+          marketValue,
+          unrealizedPnL,
+          unrealizedPnLPercent,
+          realizedPnL: pos.realizedPnL
+        });
+        
+        this.totalPortfolioValue += marketValue;
+        this.totalUnrealizedPnL += unrealizedPnL;
+      }
+      this.totalRealizedPnL += pos.realizedPnL;
+    });
+    
+    // Sort by market value
+    this.positions.sort((a, b) => b.marketValue - a.marketValue);
+    
+    // Build executions blotter
+    this.buildExecutions();
+  }
+  
+  buildExecutions(): void {
+    // Generate execution records from filled orders
+    this.executions = this.orders
+      .filter(o => o.status?.toUpperCase() === 'FILLED' || o.status?.toUpperCase() === 'PARTIALLY_FILLED')
+      .map((order, idx) => ({
+        execId: `EXC-${idx + 1}`,
+        symbol: order.symbol,
+        side: order.side,
+        quantity: order.filledQty || order.quantity,
+        price: order.price,
+        time: new Date(order.createdAt || Date.now()),
+        orderId: order.clOrdId || order.orderRefNumber || ''
+      }))
+      .sort((a, b) => b.time.getTime() - a.time.getTime())
+      .slice(0, 20); // Show last 20 executions
   }
 }
