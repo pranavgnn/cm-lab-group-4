@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { OrderService } from './services/order.service';
+import { AuthService, User, LoginRequest, RegisterRequest } from './services/auth.service';
 import { Order, SessionInfo } from './models/order.model';
 import { Subscription, interval, of } from 'rxjs';
 import { switchMap, catchError } from 'rxjs/operators';
@@ -37,6 +38,18 @@ export class AppComponent implements OnInit, OnDestroy {
   loading = false;
   error: string | null = null;
   
+  // Authentication
+  currentUser: User | null = null;
+  showLoginForm = false;
+  isRegistering = false;
+  loginForm = {
+    username: '',
+    password: '',
+    email: '',
+    displayName: ''
+  };
+  authError: string | null = null;
+  
   // Market data from exchange
   marketData: MarketData[] = [];
   
@@ -63,13 +76,28 @@ export class AppComponent implements OnInit, OnDestroy {
   private pollingSubscription?: Subscription;
   private marketDataSubscription?: Subscription;
   
-  constructor(private orderService: OrderService, private http: HttpClient) {}
+  constructor(
+    private orderService: OrderService, 
+    private http: HttpClient,
+    private authService: AuthService
+  ) {}
   
   ngOnInit(): void {
-    this.loadOrders();
-    this.loadSessionInfo();
+    // Check if user is already logged in
+    this.authService.currentUser$.subscribe(user => {
+      this.currentUser = user;
+      if (user) {
+        this.showLoginForm = false;
+        this.loadOrders();
+        this.loadSessionInfo();
+        this.loadMarketData();
+        this.startPolling();
+        this.startMarketDataPolling();
+      }
+    });
+    
+    // Load market data for ticker even if not logged in
     this.loadMarketData();
-    this.startPolling();
     this.startMarketDataPolling();
   }
   
@@ -79,6 +107,89 @@ export class AppComponent implements OnInit, OnDestroy {
     }
     if (this.marketDataSubscription) {
       this.marketDataSubscription.unsubscribe();
+    }
+  }
+  
+  // Authentication methods
+  showLogin(): void {
+    this.showLoginForm = true;
+    this.isRegistering = false;
+    this.authError = null;
+    this.resetLoginForm();
+  }
+  
+  showRegister(): void {
+    this.showLoginForm = true;
+    this.isRegistering = true;
+    this.authError = null;
+    this.resetLoginForm();
+  }
+  
+  cancelLogin(): void {
+    this.showLoginForm = false;
+    this.authError = null;
+    this.resetLoginForm();
+  }
+  
+  resetLoginForm(): void {
+    this.loginForm = {
+      username: '',
+      password: '',
+      email: '',
+      displayName: ''
+    };
+  }
+  
+  submitLogin(): void {
+    this.authError = null;
+    
+    if (this.isRegistering) {
+      const request: RegisterRequest = {
+        username: this.loginForm.username,
+        password: this.loginForm.password,
+        email: this.loginForm.email,
+        displayName: this.loginForm.displayName || this.loginForm.username
+      };
+      
+      this.authService.register(request).pipe(
+        catchError(err => {
+          this.authError = err.error?.error || 'Registration failed';
+          return of(null);
+        })
+      ).subscribe(user => {
+        if (user) {
+          this.showLoginForm = false;
+          this.resetLoginForm();
+        }
+      });
+    } else {
+      const request: LoginRequest = {
+        username: this.loginForm.username,
+        password: this.loginForm.password
+      };
+      
+      this.authService.login(request).pipe(
+        catchError(err => {
+          this.authError = err.error?.error || 'Invalid username or password';
+          return of(null);
+        })
+      ).subscribe(user => {
+        if (user) {
+          this.showLoginForm = false;
+          this.resetLoginForm();
+        }
+      });
+    }
+  }
+  
+  userLogout(): void {
+    this.authService.logout();
+    this.orders = [];
+    this.positions = [];
+    this.totalPortfolioValue = 0;
+    this.totalUnrealizedPnL = 0;
+    if (this.pollingSubscription) {
+      this.pollingSubscription.unsubscribe();
     }
   }
   

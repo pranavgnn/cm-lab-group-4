@@ -2,13 +2,75 @@
   <header class="header">
     <h1>{{ title }}</h1>
     <div class="session-controls">
+      <!-- User auth controls -->
+      <ng-container *ngIf="currentUser">
+        <span class="user-info">
+          <span class="user-icon">👤</span>
+          {{ currentUser.displayName }} 
+          <span class="account-id">({{ currentUser.accountId }})</span>
+        </span>
+        <span class="balance">Balance: ${{ currentUser.balance | number:'1.2-2' }}</span>
+      </ng-container>
+      
       <span class="status-indicator" [class.connected]="sessionInfo?.isConnected">
         {{ sessionInfo?.isConnected ? 'Connected' : 'Disconnected' }}
       </span>
-      <button class="btn-session" (click)="logon()" *ngIf="!sessionInfo?.isConnected">Connect</button>
-      <button class="btn-session btn-logout" (click)="logout()" *ngIf="sessionInfo?.isConnected">Disconnect</button>
+      
+      <ng-container *ngIf="currentUser">
+        <button class="btn-session" (click)="logon()" *ngIf="!sessionInfo?.isConnected">Connect</button>
+        <button class="btn-session btn-logout" (click)="logout()" *ngIf="sessionInfo?.isConnected">Disconnect</button>
+        <button class="btn-session btn-user-logout" (click)="userLogout()">Sign Out</button>
+      </ng-container>
+      
+      <ng-container *ngIf="!currentUser">
+        <button class="btn-session btn-login" (click)="showLogin()">Sign In</button>
+        <button class="btn-session btn-register" (click)="showRegister()">Register</button>
+      </ng-container>
     </div>
   </header>
+  
+  <!-- Login/Register Modal -->
+  <div class="modal-overlay" *ngIf="showLoginForm" (click)="cancelLogin()">
+    <div class="login-modal" (click)="$event.stopPropagation()">
+      <h2>{{ isRegistering ? 'Create Account' : 'Sign In' }}</h2>
+      
+      <div class="auth-error" *ngIf="authError">{{ authError }}</div>
+      
+      <form (ngSubmit)="submitLogin()">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" [(ngModel)]="loginForm.username" name="username" required placeholder="Enter username">
+        </div>
+        
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" [(ngModel)]="loginForm.password" name="password" required placeholder="Enter password">
+        </div>
+        
+        <ng-container *ngIf="isRegistering">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" [(ngModel)]="loginForm.email" name="email" placeholder="Enter email">
+          </div>
+          
+          <div class="form-group">
+            <label>Display Name</label>
+            <input type="text" [(ngModel)]="loginForm.displayName" name="displayName" placeholder="Optional display name">
+          </div>
+        </ng-container>
+        
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">{{ isRegistering ? 'Create Account' : 'Sign In' }}</button>
+          <button type="button" class="btn-secondary" (click)="cancelLogin()">Cancel</button>
+        </div>
+        
+        <div class="auth-switch">
+          <span *ngIf="!isRegistering">Don't have an account? <a (click)="showRegister()">Register</a></span>
+          <span *ngIf="isRegistering">Already have an account? <a (click)="showLogin()">Sign In</a></span>
+        </div>
+      </form>
+    </div>
+  </div>
   
   <!-- Market Ticker -->
   <div class="market-ticker" *ngIf="marketData.length > 0">
@@ -34,7 +96,20 @@
     </div>
   </div>
   
-  <!-- Dashboard Stats -->
+  <!-- Not Logged In Message -->
+  <div class="login-prompt" *ngIf="!currentUser">
+    <div class="login-prompt-content">
+      <h2>Welcome to Broker Platform</h2>
+      <p>Sign in or create an account to start trading.</p>
+      <div class="login-prompt-buttons">
+        <button class="btn-primary" (click)="showLogin()">Sign In</button>
+        <button class="btn-secondary" (click)="showRegister()">Create Account</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Main Content (only when logged in) -->
+  <ng-container *ngIf="currentUser">
   <div class="dashboard-stats">
     <div class="stat-item">
       <div class="stat-label">Portfolio Value</div>
@@ -239,6 +314,7 @@
       </table>
     </div>
   </section>
+  </ng-container>
   
   <footer class="footer">
     <p>Broker Trading Platform (FIX Initiator) | Target: localhost:9876</p>

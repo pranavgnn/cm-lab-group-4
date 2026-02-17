@@ -6,8 +6,10 @@ import javax.enterprise.context.ApplicationScoped;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.transaction.Transactional;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import com.helesto.model.OrderEntity;
 
 @ApplicationScoped
@@ -42,6 +44,20 @@ public class OrderDao {
     public List<OrderEntity> findAll() {
         LOG.info("Finding all orders");
         return em.createQuery("SELECT o FROM OrderEntity o ORDER BY o.createdAt DESC", OrderEntity.class)
+                .getResultList();
+    }
+
+    public List<OrderEntity> findByUserId(Long userId) {
+        LOG.info("Finding orders for userId: {}", userId);
+        return em.createQuery("SELECT o FROM OrderEntity o WHERE o.userId = :userId ORDER BY o.createdAt DESC", OrderEntity.class)
+                .setParameter("userId", userId)
+                .getResultList();
+    }
+
+    public List<OrderEntity> findByAccountId(String accountId) {
+        LOG.info("Finding orders for accountId: {}", accountId);
+        return em.createQuery("SELECT o FROM OrderEntity o WHERE o.accountId = :accountId ORDER BY o.createdAt DESC", OrderEntity.class)
+                .setParameter("accountId", accountId)
                 .getResultList();
     }
 }

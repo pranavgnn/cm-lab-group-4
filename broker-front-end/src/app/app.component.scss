@@ -441,3 +441,219 @@ $shadow-md: 0 4px 12px rgba(0,0,0,0.1);
   text-align: center;
   p { margin: 0; font-size: 12px; color: $text-secondary; }
 }
+
+// User Info in Header
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: $primary-light;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: $primary;
+  .user-icon { font-size: 16px; }
+  .account-id { font-size: 10px; color: $text-secondary; font-weight: 400; }
+}
+
+.balance {
+  font-size: 13px;
+  font-weight: 600;
+  color: $success;
+  padding: 8px 16px;
+  background: $success-light;
+  border-radius: 20px;
+}
+
+.btn-user-logout {
+  background: transparent !important;
+  color: $text-secondary !important;
+  border: 2px solid $border-color !important;
+  box-shadow: none !important;
+  &:hover { background: $bg-input !important; color: $text-primary !important; }
+}
+
+.btn-login, .btn-register {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-login {
+  background: $primary;
+  color: #fff;
+  &:hover { background: darken($primary, 8%); }
+}
+
+.btn-register {
+  background: transparent;
+  color: $primary;
+  border: 2px solid $primary !important;
+  &:hover { background: $primary-light; }
+}
+
+// Login Modal
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.login-modal {
+  background: $bg-card;
+  border-radius: 16px;
+  padding: 32px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: $shadow-md;
+  
+  h2 {
+    margin: 0 0 24px;
+    font-size: 24px;
+    font-weight: 700;
+    color: $text-primary;
+    text-align: center;
+  }
+  
+  .form-group {
+    margin-bottom: 16px;
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: $text-secondary;
+    }
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid $border-color;
+      border-radius: 8px;
+      font-size: 14px;
+      background: $bg-input;
+      transition: border-color 0.2s;
+      &:focus {
+        outline: none;
+        border-color: $primary;
+      }
+    }
+  }
+  
+  .form-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    .btn-primary, .btn-secondary {
+      flex: 1;
+      padding: 14px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+    }
+    .btn-primary {
+      background: $primary;
+      color: #fff;
+      &:hover { background: darken($primary, 8%); }
+    }
+    .btn-secondary {
+      background: transparent;
+      color: $text-secondary;
+      border: 2px solid $border-color;
+      &:hover { background: $bg-input; }
+    }
+  }
+  
+  .auth-switch {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 13px;
+    color: $text-secondary;
+    a {
+      color: $primary;
+      cursor: pointer;
+      font-weight: 600;
+      &:hover { text-decoration: underline; }
+    }
+  }
+  
+  .auth-error {
+    background: $danger-light;
+    color: $danger;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+}
+
+// Login Prompt (not logged in state)
+.login-prompt {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.login-prompt-content {
+  text-align: center;
+  max-width: 400px;
+  
+  h2 {
+    font-size: 32px;
+    font-weight: 700;
+    color: $text-primary;
+    margin-bottom: 16px;
+  }
+  
+  p {
+    font-size: 16px;
+    color: $text-secondary;
+    margin-bottom: 32px;
+  }
+}
+
+.login-prompt-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  
+  .btn-primary, .btn-secondary {
+    padding: 14px 32px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+  }
+  
+  .btn-primary {
+    background: $primary;
+    color: #fff;
+    &:hover { background: darken($primary, 8%); }
+  }
+  
+  .btn-secondary {
+    background: transparent;
+    color: $primary;
+    border: 2px solid $primary;
+    &:hover { background: $primary-light; }
+  }
+}
