@@ -6,8 +6,10 @@ import javax.enterprise.context.ApplicationScoped;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.transaction.Transactional;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import com.helesto.model.OrderEntity;
 
 @ApplicationScoped
@@ -39,9 +41,45 @@ public class OrderDao {
                 .orElse(null);
     }
 
+    public OrderEntity findByOrderRefNumber(String orderRefNumber) {
+        LOG.info("Finding order by OrderRefNumber: {}", orderRefNumber);
+        return em.createQuery("SELECT o FROM OrderEntity o WHERE o.orderRefNumber = :orderRefNumber", OrderEntity.class)
+                .setParameter("orderRefNumber", orderRefNumber)
+                .getResultStream()
+                .findFirst()
+                .orElse(null);
+    }
+
     public List<OrderEntity> findAll() {
         LOG.info("Finding all orders");
         return em.createQuery("SELECT o FROM OrderEntity o ORDER BY o.createdAt DESC", OrderEntity.class)
                 .getResultList();
+    }
+
+    public List<OrderEntity> findBySymbol(String symbol) {
+        LOG.info("Finding orders by symbol: {}", symbol);
+        return em.createQuery("SELECT o FROM OrderEntity o WHERE o.symbol = :symbol ORDER BY o.createdAt DESC", OrderEntity.class)
+                .setParameter("symbol", symbol)
+                .getResultList();
+    }
+
+    public List<OrderEntity> findByStatus(String status) {
+        LOG.info("Finding orders by status: {}", status);
+        return em.createQuery("SELECT o FROM OrderEntity o WHERE o.status = :status ORDER BY o.createdAt DESC", OrderEntity.class)
+                .setParameter("status", status)
+                .getResultList();
+    }
+
+    public List<OrderEntity> findByClientId(String clientId) {
+        LOG.info("Finding orders by clientId: {}", clientId);
+        return em.createQuery("SELECT o FROM OrderEntity o WHERE o.clientId = :clientId ORDER BY o.createdAt DESC", OrderEntity.class)
+                .setParameter("clientId", clientId)
+                .getResultList();
+    }
+
+    @Transactional
+    public void update(OrderEntity order) {
+        LOG.info("Updating order: {}", order.getOrderRefNumber());
+        em.merge(order);
     }
 }
