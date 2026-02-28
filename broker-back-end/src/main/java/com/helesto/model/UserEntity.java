@@ -32,6 +32,8 @@ public class UserEntity {
     
     private Double balance;
     
+    private Boolean isAdmin;
+    
     private LocalDateTime createdAt;
     private LocalDateTime lastLoginAt;
     
@@ -112,5 +114,13 @@ public class UserEntity {
     
     public void setLastLoginAt(LocalDateTime lastLoginAt) {
         this.lastLoginAt = lastLoginAt;
+    }
+    
+    public Boolean getIsAdmin() {
+        return isAdmin != null && isAdmin;
+    }
+    
+    public void setIsAdmin(Boolean isAdmin) {
+        this.isAdmin = isAdmin;
     }
 }

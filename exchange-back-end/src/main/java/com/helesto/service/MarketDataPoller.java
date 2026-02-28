@@ -152,12 +152,46 @@ public class MarketDataPoller {
         basePrices.put("HON", 198.75);
         basePrices.put("UPS", 148.30);
         basePrices.put("RTX", 98.65);
+        basePrices.put("LMT", 475.30);
+        basePrices.put("DE", 418.60);
         
         // Energy
         basePrices.put("XOM", 105.40);
         basePrices.put("CVX", 148.90);
         basePrices.put("COP", 115.30);
         basePrices.put("SLB", 48.75);
+        basePrices.put("EOG", 125.40);
+        basePrices.put("MPC", 165.80);
+        basePrices.put("VLO", 148.20);
+        
+        // Telecommunications
+        basePrices.put("T", 17.85);
+        basePrices.put("VZ", 41.20);
+        basePrices.put("TMUS", 168.45);
+        basePrices.put("CMCSA", 42.80);
+        basePrices.put("CHTR", 295.60);
+        
+        // Materials
+        basePrices.put("LIN", 458.90);
+        basePrices.put("FCX", 42.65);
+        basePrices.put("NEM", 38.45);
+        basePrices.put("SHW", 328.70);
+        basePrices.put("DOW", 55.80);
+        basePrices.put("APD", 285.40);
+        
+        // Real Estate
+        basePrices.put("PLD", 128.45);
+        basePrices.put("AMT", 215.60);
+        basePrices.put("EQIX", 825.30);
+        basePrices.put("SPG", 152.80);
+        basePrices.put("O", 58.45);
+        
+        // Utilities
+        basePrices.put("NEE", 78.90);
+        basePrices.put("DUK", 102.45);
+        basePrices.put("SO", 72.60);
+        basePrices.put("D", 52.80);
+        basePrices.put("AEP", 88.35);
         
         LOG.info("Initialized {} base prices for simulation", basePrices.size());
     }

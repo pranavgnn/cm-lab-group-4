@@ -1,7 +1,15 @@
 package com.helesto.rest;
 
-import com.helesto.model.UserEntity;
-import com.helesto.service.UserService;
+import javax.inject.Inject;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -9,10 +17,8 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
-import javax.ws.rs.*;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
+import com.helesto.model.UserEntity;
+import com.helesto.service.UserService;
 
 @Path("/api/auth")
 @Produces(MediaType.APPLICATION_JSON)
@@ -91,6 +97,39 @@ public class AuthRest {
         return Response.ok().entity(toUserResponse(user)).build();
     }
     
+    @POST
+    @Path("/admin/create")
+    @Operation(summary = "Create admin user", description = "Create a new admin user (requires admin override key)")
+    @APIResponse(responseCode = "201", description = "Admin created", content = @Content(schema = @Schema(implementation = UserResponse.class)))
+    @APIResponse(responseCode = "403", description = "Invalid admin key")
+    public Response createAdmin(AdminCreateRequest request) {
+        LOG.info("POST /api/auth/admin/create - username: {}", request.username);
+        
+        // Verify admin override key
+        if (!"ADMIN-MASTER-2026".equals(request.adminKey)) {
+            return Response.status(Response.Status.FORBIDDEN)
+                    .entity(new ErrorResponse("Invalid admin key"))
+                    .build();
+        }
+        
+        try {
+            UserEntity admin = userService.createAdminUser(
+                request.username,
+                request.password,
+                request.email
+            );
+            
+            return Response.status(Response.Status.CREATED)
+                    .entity(toUserResponse(admin))
+                    .build();
+        } catch (Exception e) {
+            LOG.error("Admin creation failed", e);
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ErrorResponse(e.getMessage()))
+                    .build();
+        }
+    }
+    
     private UserResponse toUserResponse(UserEntity user) {
         UserResponse response = new UserResponse();
         response.id = user.getId();
@@ -99,6 +138,7 @@ public class AuthRest {
         response.displayName = user.getDisplayName();
         response.accountId = user.getAccountId();
         response.balance = user.getBalance();
+        response.isAdmin = user.getIsAdmin();
         return response;
     }
     
@@ -116,6 +156,13 @@ public class AuthRest {
         public String password;
     }
     
+    public static class AdminCreateRequest {
+        public String username;
+        public String password;
+        public String email;
+        public String adminKey;
+    }
+    
     public static class UserResponse {
         public Long id;
         public String username;
@@ -123,6 +170,7 @@ public class AuthRest {
         public String displayName;
         public String accountId;
         public Double balance;
+        public Boolean isAdmin;
     }
     
     public static class ErrorResponse {

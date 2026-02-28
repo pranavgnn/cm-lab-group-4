@@ -1,41 +1,94 @@
 <div class="app-container">
   <header class="header">
-    <h1>{{ title }}</h1>
-    <div class="session-status" *ngIf="sessionStatus">
-      <span class="status-indicator" [class.connected]="sessionStatus?.connected">
-        {{ sessionStatus?.connected ? 'Connected' : 'Disconnected' }}
-      </span>
-      <span class="session-info" *ngIf="sessionStatus?.sessionId">
-        {{ sessionStatus.sessionId }}
-      </span>
+    <div class="header-left">
+      <h1>{{ title }}</h1>
+      <div class="system-health">
+        <span class="health-dot" [class.healthy]="systemHealth.healthy"></span>
+        <span class="health-text">{{ systemHealth.healthy ? 'All Systems Operational' : 'System Issues' }}</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="session-status" *ngIf="sessionStatus">
+        <span class="status-indicator" [class.connected]="sessionStatus?.connected">
+          <span class="status-dot"></span>
+          {{ sessionStatus?.connected ? 'FIX Connected' : 'Disconnected' }}
+        </span>
+        <span class="session-info" *ngIf="sessionStatus?.sessionId">
+          {{ sessionStatus.sessionId }}
+        </span>
+      </div>
+      <div class="header-time">{{ currentTime | date:'HH:mm:ss' }}</div>
     </div>
   </header>
+  
+  <!-- Market Summary Banner -->
+  <div class="market-summary-banner">
+    <div class="summary-item">
+      <span class="summary-label">Total Volume</span>
+      <span class="summary-value">{{ getTotalVolume() | number:'1.0-0' }}</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-label">Orders Today</span>
+      <span class="summary-value">{{ orders.length }}</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-label">Filled Orders</span>
+      <span class="summary-value positive">{{ getFilledCount() }}</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-label">Fill Rate</span>
+      <span class="summary-value">{{ getFillRate() | number:'1.1-1' }}%</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-label">Avg Latency</span>
+      <span class="summary-value">{{ getAvgLatency() }}ms</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-label">Market Status</span>
+      <span class="summary-value market-open">● OPEN</span>
+    </div>
+  </div>
   
   <!-- Dashboard Stats -->
   <div class="dashboard-stats">
     <div class="stat-item">
-      <div class="stat-label">Portfolio Value</div>
-      <div class="stat-value">${{ totalPortfolioValue | number:'1.2-2' }}</div>
-    </div>
-    <div class="stat-item">
-      <div class="stat-label">Unrealized P&L</div>
-      <div class="stat-value" [class.positive]="totalUnrealizedPnL >= 0" [class.negative]="totalUnrealizedPnL < 0">
-        {{ totalUnrealizedPnL >= 0 ? '+' : '' }}${{ totalUnrealizedPnL | number:'1.2-2' }}
+      <div class="stat-icon">💰</div>
+      <div class="stat-content">
+        <div class="stat-label">Portfolio Value</div>
+        <div class="stat-value">${{ totalPortfolioValue | number:'1.2-2' }}</div>
       </div>
     </div>
     <div class="stat-item">
-      <div class="stat-label">Realized P&L</div>
-      <div class="stat-value" [class.positive]="totalRealizedPnL >= 0" [class.negative]="totalRealizedPnL < 0">
-        {{ totalRealizedPnL >= 0 ? '+' : '' }}${{ totalRealizedPnL | number:'1.2-2' }}
+      <div class="stat-icon">📈</div>
+      <div class="stat-content">
+        <div class="stat-label">Unrealized P&L</div>
+        <div class="stat-value" [class.positive]="totalUnrealizedPnL >= 0" [class.negative]="totalUnrealizedPnL < 0">
+          {{ totalUnrealizedPnL >= 0 ? '+' : '' }}${{ totalUnrealizedPnL | number:'1.2-2' }}
+        </div>
       </div>
     </div>
     <div class="stat-item">
-      <div class="stat-label">Positions</div>
-      <div class="stat-value">{{ positions.length }}</div>
+      <div class="stat-icon">💵</div>
+      <div class="stat-content">
+        <div class="stat-label">Realized P&L</div>
+        <div class="stat-value" [class.positive]="totalRealizedPnL >= 0" [class.negative]="totalRealizedPnL < 0">
+          {{ totalRealizedPnL >= 0 ? '+' : '' }}${{ totalRealizedPnL | number:'1.2-2' }}
+        </div>
+      </div>
     </div>
     <div class="stat-item">
-      <div class="stat-label">Open Orders</div>
-      <div class="stat-value">{{ getOpenCount() }}</div>
+      <div class="stat-icon">📊</div>
+      <div class="stat-content">
+        <div class="stat-label">Positions</div>
+        <div class="stat-value">{{ positions.length }}</div>
+      </div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon">⏳</div>
+      <div class="stat-content">
+        <div class="stat-label">Open Orders</div>
+        <div class="stat-value">{{ getOpenCount() }}</div>
+      </div>
     </div>
   </div>
   
@@ -249,7 +302,10 @@
   <!-- Trade Blotter -->
   <section class="blotter-section" *ngIf="executions.length > 0">
     <div class="panel">
-      <h2>Recent Executions</h2>
+      <div class="panel-header">
+        <h2>📋 Recent Executions</h2>
+        <span class="execution-count">{{ executions.length }} trades</span>
+      </div>
       <table class="blotter-table">
         <thead>
           <tr>
@@ -277,7 +333,319 @@
     </div>
   </section>
   
+  <!-- Order Book Visualization -->
+  <section class="orderbook-section">
+    <div class="panel">
+      <div class="panel-header">
+        <h2>📊 Live Order Book - {{ selectedOrderBookSymbol }}</h2>
+        <select [(ngModel)]="selectedOrderBookSymbol" (ngModelChange)="onOrderBookSymbolChange()">
+          <optgroup *ngFor="let cat of getOrderBookCategories()" [label]="cat.name">
+            <option *ngFor="let stock of cat.stocks" [value]="stock.symbol">{{ stock.symbol }} - {{ stock.name }}</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="orderbook-container">
+        <div class="orderbook-side bids">
+          <div class="orderbook-title">BIDS (Buy Orders)</div>
+          <div class="orderbook-row" *ngFor="let bid of generateOrderBook().bids; let i = index">
+            <div class="orderbook-bar bid" [style.width.%]="bid.percent"></div>
+            <span class="orderbook-size">{{ bid.size | number }}</span>
+            <span class="orderbook-price">${{ bid.price | number:'1.2-2' }}</span>
+            <span class="orderbook-total">${{ bid.total | number:'1.0-0' }}</span>
+          </div>
+        </div>
+        <div class="orderbook-spread">
+          <div class="spread-info">
+            <span class="spread-label">Spread</span>
+            <span class="spread-value">${{ getOrderBookSpread() | number:'1.2-2' }}</span>
+            <span class="spread-percent">({{ getSpreadPercent() | number:'1.3-3' }}%)</span>
+          </div>
+          <div class="mid-price">
+            <span class="mid-label">Mid Price</span>
+            <span class="mid-value">${{ getMidPrice() | number:'1.2-2' }}</span>
+          </div>
+        </div>
+        <div class="orderbook-side asks">
+          <div class="orderbook-title">ASKS (Sell Orders)</div>
+          <div class="orderbook-row" *ngFor="let ask of generateOrderBook().asks; let i = index">
+            <div class="orderbook-bar ask" [style.width.%]="ask.percent"></div>
+            <span class="orderbook-price">${{ ask.price | number:'1.2-2' }}</span>
+            <span class="orderbook-size">{{ ask.size | number }}</span>
+            <span class="orderbook-total">${{ ask.total | number:'1.0-0' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+  <!-- Arbitrage & Analytics Section -->
+  <section class="analytics-section">
+    <div class="analytics-grid">
+      
+      <!-- Spread Opportunities Scanner -->
+      <div class="analytics-card spread-scanner">
+        <div class="card-header">
+          <h3>🎯 Spread Opportunities</h3>
+          <span class="card-subtitle">Top spreads by basis points</span>
+        </div>
+        <div class="spread-list">
+          <div class="spread-item" *ngFor="let opp of spreadOpportunities" 
+               [class]="getOpportunityClass(opp.opportunity)">
+            <span class="spread-symbol">{{ opp.symbol }}</span>
+            <span class="spread-value">${{ opp.spread | number:'1.4-4' }}</span>
+            <span class="spread-bps">{{ opp.spreadBps | number:'1.2-2' }} bps</span>
+            <span class="spread-badge" [class]="'badge-' + opp.opportunity.toLowerCase()">{{ opp.opportunity }}</span>
+          </div>
+          <div class="empty-state" *ngIf="spreadOpportunities.length === 0">
+            <span>Scanning for opportunities...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Correlated Pairs Arbitrage -->
+      <div class="analytics-card pairs-trading">
+        <div class="card-header">
+          <h3>⚖️ Pairs Trading Signals</h3>
+          <span class="card-subtitle">Statistical arbitrage opportunities</span>
+        </div>
+        <div class="pairs-list">
+          <div class="pair-item" *ngFor="let pair of correlatedPairs" [class]="getSignalClass(pair.signal)">
+            <div class="pair-info">
+              <span class="pair-name">{{ pair.pair }}</span>
+              <span class="pair-corr">ρ={{ pair.correlation | number:'1.2-2' }}</span>
+            </div>
+            <div class="pair-metrics">
+              <span class="divergence" [class.positive]="pair.divergence > 0" [class.negative]="pair.divergence < 0">
+                {{ pair.divergence >= 0 ? '+' : '' }}{{ pair.divergence }}%
+              </span>
+              <span class="signal-badge">{{ pair.signal }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Market Inefficiencies -->
+      <div class="analytics-card inefficiencies">
+        <div class="card-header">
+          <h3>⚠️ Market Inefficiencies</h3>
+          <span class="card-subtitle">Detected anomalies</span>
+        </div>
+        <div class="inefficiency-list">
+          <div class="inefficiency-item" *ngFor="let ineff of marketInefficiencies">
+            <div class="ineff-main">
+              <span class="ineff-symbol">{{ ineff.symbol }}</span>
+              <span class="ineff-type" [class]="'type-' + ineff.type.toLowerCase().replace('_', '-')">{{ ineff.type }}</span>
+            </div>
+            <div class="ineff-metrics">
+              <span class="magnitude">{{ ineff.magnitude | number:'1.2-2' }}{{ ineff.type.includes('SPREAD') ? ' bps' : '%' }}</span>
+              <div class="confidence-bar">
+                <div class="confidence-fill" [style.width.%]="ineff.confidence"></div>
+              </div>
+              <span class="confidence-val">{{ ineff.confidence }}%</span>
+            </div>
+          </div>
+          <div class="empty-state" *ngIf="marketInefficiencies.length === 0">
+            <span>No inefficiencies detected</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Market Breadth -->
+      <div class="analytics-card market-breadth">
+        <div class="card-header">
+          <h3>📊 Market Breadth</h3>
+          <span class="card-subtitle">Advancers vs Decliners</span>
+        </div>
+        <div class="breadth-content">
+          <div class="breadth-chart">
+            <div class="breadth-bar">
+              <div class="advancers-bar" [style.width.%]="(marketBreadth.advancers / allStocks.length) * 100"></div>
+              <div class="decliners-bar" [style.width.%]="(marketBreadth.decliners / allStocks.length) * 100"></div>
+            </div>
+          </div>
+          <div class="breadth-stats">
+            <div class="breadth-stat positive">
+              <span class="stat-icon">▲</span>
+              <span class="stat-count">{{ marketBreadth.advancers }}</span>
+              <span class="stat-label">Advancers</span>
+            </div>
+            <div class="breadth-stat neutral">
+              <span class="stat-icon">●</span>
+              <span class="stat-count">{{ marketBreadth.unchanged }}</span>
+              <span class="stat-label">Unchanged</span>
+            </div>
+            <div class="breadth-stat negative">
+              <span class="stat-icon">▼</span>
+              <span class="stat-count">{{ marketBreadth.decliners }}</span>
+              <span class="stat-label">Decliners</span>
+            </div>
+          </div>
+          <div class="total-volume">
+            <span class="vol-label">Total Market Volume</span>
+            <span class="vol-value">{{ formatVolume(totalMarketVolume) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sector Performance -->
+      <div class="analytics-card sector-perf">
+        <div class="card-header">
+          <h3>🏢 Sector Performance</h3>
+          <span class="card-subtitle">By average change</span>
+        </div>
+        <div class="sector-list">
+          <div class="sector-item" *ngFor="let sector of sectorPerformance">
+            <span class="sector-name">{{ sector.sector }}</span>
+            <div class="sector-bar-container">
+              <div class="sector-bar" 
+                   [class.positive]="sector.change >= 0" 
+                   [class.negative]="sector.change < 0"
+                   [style.width.%]="Math.min(100, Math.abs(sector.change) * 20)">
+              </div>
+            </div>
+            <span class="sector-change" [class.positive]="sector.change >= 0" [class.negative]="sector.change < 0">
+              {{ sector.change >= 0 ? '+' : '' }}{{ sector.change }}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Technical Indicators -->
+      <div class="analytics-card tech-indicators">
+        <div class="card-header">
+          <h3>📈 Technical Indicators</h3>
+          <span class="card-subtitle">Selected symbol: {{ selectedOrderBookSymbol }}</span>
+        </div>
+        <div class="indicator-grid">
+          <div class="indicator-item">
+            <span class="ind-label">VWAP</span>
+            <span class="ind-value">${{ getVwap(selectedOrderBookSymbol) | number:'1.2-2' }}</span>
+          </div>
+          <div class="indicator-item" [class]="getRsiClass(getRsi(selectedOrderBookSymbol))">
+            <span class="ind-label">RSI (14)</span>
+            <span class="ind-value">{{ getRsi(selectedOrderBookSymbol) }}</span>
+          </div>
+          <div class="indicator-item">
+            <span class="ind-label">IV (Ann.)</span>
+            <span class="ind-value">{{ getVolatility(selectedOrderBookSymbol) }}%</span>
+          </div>
+          <div class="indicator-item">
+            <span class="ind-label">Spread</span>
+            <span class="ind-value">{{ (getSpreadPercent() * 100) | number:'1.2-2' }} bps</span>
+          </div>
+        </div>
+        <div class="rsi-gauge">
+          <div class="gauge-track">
+            <div class="gauge-zones">
+              <div class="zone oversold"></div>
+              <div class="zone neutral"></div>
+              <div class="zone overbought"></div>
+            </div>
+            <div class="gauge-needle" [style.left.%]="getRsi(selectedOrderBookSymbol)"></div>
+          </div>
+          <div class="gauge-labels">
+            <span>Oversold</span>
+            <span>Neutral</span>
+            <span>Overbought</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- System Status Panel -->
+  <section class="system-status-section">
+    <div class="system-grid">
+      <div class="system-card">
+        <div class="system-header">
+          <h3>🖥️ Exchange Engine</h3>
+          <span class="status-badge online">ONLINE</span>
+        </div>
+        <div class="system-metrics">
+          <div class="metric-row">
+            <span>Orders/sec</span>
+            <span class="metric-val">{{ getOrdersPerSecond() | number:'1.0-0' }}</span>
+          </div>
+          <div class="metric-row">
+            <span>Latency</span>
+            <span class="metric-val">{{ getAvgLatency() }}ms</span>
+          </div>
+          <div class="metric-row">
+            <span>Uptime</span>
+            <span class="metric-val">99.99%</span>
+          </div>
+        </div>
+      </div>
+      <div class="system-card">
+        <div class="system-header">
+          <h3>📡 FIX Gateway</h3>
+          <span class="status-badge" [class.online]="sessionStatus?.connected" [class.offline]="!sessionStatus?.connected">
+            {{ sessionStatus?.connected ? 'CONNECTED' : 'DISCONNECTED' }}
+          </span>
+        </div>
+        <div class="system-metrics">
+          <div class="metric-row">
+            <span>Messages In</span>
+            <span class="metric-val">{{ getMessagesIn() | number }}</span>
+          </div>
+          <div class="metric-row">
+            <span>Messages Out</span>
+            <span class="metric-val">{{ getMessagesOut() | number }}</span>
+          </div>
+          <div class="metric-row">
+            <span>Session</span>
+            <span class="metric-val">FIX.4.4</span>
+          </div>
+        </div>
+      </div>
+      <div class="system-card">
+        <div class="system-header">
+          <h3>💾 Data Store</h3>
+          <span class="status-badge online">HEALTHY</span>
+        </div>
+        <div class="system-metrics">
+          <div class="metric-row">
+            <span>Orders Stored</span>
+            <span class="metric-val">{{ orders.length }}</span>
+          </div>
+          <div class="metric-row">
+            <span>Securities</span>
+            <span class="metric-val">{{ allStocks.length }}</span>
+          </div>
+          <div class="metric-row">
+            <span>DB Status</span>
+            <span class="metric-val">H2 In-Memory</span>
+          </div>
+        </div>
+      </div>
+      <div class="system-card">
+        <div class="system-header">
+          <h3>📊 Market Data</h3>
+          <span class="status-badge online">STREAMING</span>
+        </div>
+        <div class="system-metrics">
+          <div class="metric-row">
+            <span>Quotes/sec</span>
+            <span class="metric-val">{{ getQuotesPerSecond() | number:'1.0-0' }}</span>
+          </div>
+          <div class="metric-row">
+            <span>Symbols</span>
+            <span class="metric-val">{{ allStocks.length }}</span>
+          </div>
+          <div class="metric-row">
+            <span>Last Update</span>
+            <span class="metric-val">{{ getLastUpdateTime() }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  
   <footer class="footer">
-    <p>Exchange Trading Platform (FIX Acceptor) | Port 9876 | {{ allStocks.length }} Securities</p>
+    <div class="footer-content">
+      <span class="footer-brand">🏛️ Exchange Trading Platform</span>
+      <span class="footer-info">FIX 4.4 Acceptor | Port 9876 | {{ allStocks.length }} Securities</span>
+      <span class="footer-time">{{ currentTime | date:'HH:mm:ss' }}</span>
+    </div>
   </footer>
 </div>

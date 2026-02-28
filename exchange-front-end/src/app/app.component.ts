@@ -74,6 +74,9 @@ export class AppComponent implements OnInit, OnDestroy {
   error: string | null = null;
   success: string | null = null;
   
+  // Expose Math for template
+  Math = Math;
+  
   // Market Data - Categorized
   stockCategories: StockCategory[] = [];
   filteredCategories: StockCategory[] = [];
@@ -89,6 +92,27 @@ export class AppComponent implements OnInit, OnDestroy {
   
   // Trade History Blotter
   executions: Execution[] = [];
+  
+  // New feature properties
+  currentTime = new Date();
+  selectedOrderBookSymbol = 'AAPL';
+  systemHealth = { healthy: true };
+  
+  // Arbitrage & Spread Analysis
+  spreadOpportunities: {symbol: string, spread: number, spreadBps: number, opportunity: string}[] = [];
+  correlatedPairs: {pair: string, correlation: number, divergence: number, signal: string}[] = [];
+  marketInefficiencies: {symbol: string, type: string, magnitude: number, confidence: number}[] = [];
+  historicalSpreads: Map<string, number[]> = new Map();
+  
+  // Technical Indicators
+  vwapData: Map<string, number> = new Map();
+  rsiData: Map<string, number> = new Map();
+  volatilityData: Map<string, number> = new Map();
+  
+  // Market Statistics
+  totalMarketVolume = 0;
+  marketBreadth = { advancers: 0, decliners: 0, unchanged: 0 };
+  sectorPerformance: {sector: string, change: number, volume: number}[] = [];
   
   private basePrices: Map<string, number> = new Map();
   
@@ -113,6 +137,15 @@ export class AppComponent implements OnInit, OnDestroy {
     this.loadSessionStatus();
     this.startPolling();
     this.startMarketDataPolling();
+    
+    // Update time every second
+    setInterval(() => {
+      this.currentTime = new Date();
+      this.updateAnalytics();
+    }, 1000);
+    
+    // Initialize correlated pairs for arbitrage monitoring
+    this.initializeCorrelatedPairs();
   }
   
   ngOnDestroy(): void {
@@ -458,5 +491,287 @@ export class AppComponent implements OnInit, OnDestroy {
       }))
       .sort((a, b) => b.time.getTime() - a.time.getTime())
       .slice(0, 20); // Show last 20 executions
+  }
+  
+  // New Analytics Methods
+  getOrderVolume(): number {
+    return this.orders.reduce((sum, o) => sum + (o.quantity || 0), 0);
+  }
+  
+  getFillRate(): number {
+    if (this.orders.length === 0) return 0;
+    const filled = this.getFilledCount();
+    return (filled / this.orders.length) * 100;
+  }
+  
+  getAvgLatency(): number {
+    // Simulated latency - in real system would track actual latency
+    return Math.floor(Math.random() * 3) + 1;
+  }
+  
+  getOrdersPerSecond(): number {
+    // Simulated throughput
+    return Math.floor(Math.random() * 500) + 100;
+  }
+  
+  getQuotesPerSecond(): number {
+    return Math.floor(Math.random() * 1000) + 500;
+  }
+  
+  getMessagesIn(): number {
+    return this.orders.length * 2 + Math.floor(Math.random() * 100);
+  }
+  
+  getMessagesOut(): number {
+    return this.orders.length * 3 + Math.floor(Math.random() * 100);
+  }
+  
+  getLastUpdateTime(): string {
+    return new Date().toLocaleTimeString();
+  }
+  
+  // Order Book Methods
+  onOrderBookSymbolChange(): void {
+    // Refresh order book for new symbol - no action needed as generateOrderBook uses selectedOrderBookSymbol
+    console.log('Order book symbol changed to:', this.selectedOrderBookSymbol);
+  }
+
+  getOrderBookCategories(): StockCategory[] {
+    // Return categories with only EQUITY stocks for the order book dropdown
+    return this.stockCategories.filter(cat => cat.stocks.length > 0);
+  }
+  
+  generateOrderBook(): { bids: any[], asks: any[] } {
+    const stock = this.allStocks.find(s => s.symbol === this.selectedOrderBookSymbol);
+    const midPrice = stock?.price || 175;
+    
+    const bids = [];
+    const asks = [];
+    let cumBidSize = 0;
+    let cumAskSize = 0;
+    
+    for (let i = 0; i < 8; i++) {
+      const bidSize = Math.floor(Math.random() * 500) + 100;
+      const askSize = Math.floor(Math.random() * 500) + 100;
+      cumBidSize += bidSize;
+      cumAskSize += askSize;
+      
+      bids.push({
+        price: midPrice - (i + 1) * 0.05,
+        size: bidSize,
+        total: cumBidSize * (midPrice - (i + 1) * 0.05),
+        percent: Math.min(100, bidSize / 5)
+      });
+      
+      asks.push({
+        price: midPrice + (i + 1) * 0.05,
+        size: askSize,
+        total: cumAskSize * (midPrice + (i + 1) * 0.05),
+        percent: Math.min(100, askSize / 5)
+      });
+    }
+    
+    return { bids, asks };
+  }
+  
+  getOrderBookSpread(): number {
+    const stock = this.allStocks.find(s => s.symbol === this.selectedOrderBookSymbol);
+    return stock ? (stock.ask - stock.bid) : 0.10;
+  }
+  
+  getSpreadPercent(): number {
+    const stock = this.allStocks.find(s => s.symbol === this.selectedOrderBookSymbol);
+    if (!stock) return 0;
+    return ((stock.ask - stock.bid) / stock.price) * 100;
+  }
+  
+  getMidPrice(): number {
+    const stock = this.allStocks.find(s => s.symbol === this.selectedOrderBookSymbol);
+    return stock ? (stock.bid + stock.ask) / 2 : 175;
+  }
+
+  // ============= ARBITRAGE & SPREAD ANALYSIS =============
+  
+  initializeCorrelatedPairs(): void {
+    this.correlatedPairs = [
+      { pair: 'AAPL/MSFT', correlation: 0.85, divergence: 0, signal: 'NEUTRAL' },
+      { pair: 'GOOGL/META', correlation: 0.78, divergence: 0, signal: 'NEUTRAL' },
+      { pair: 'JPM/BAC', correlation: 0.92, divergence: 0, signal: 'NEUTRAL' },
+      { pair: 'XOM/CVX', correlation: 0.95, divergence: 0, signal: 'NEUTRAL' },
+      { pair: 'V/MA', correlation: 0.88, divergence: 0, signal: 'NEUTRAL' },
+      { pair: 'KO/PEP', correlation: 0.82, divergence: 0, signal: 'NEUTRAL' },
+      { pair: 'NVDA/AMD', correlation: 0.75, divergence: 0, signal: 'NEUTRAL' },
+      { pair: 'JNJ/PFE', correlation: 0.72, divergence: 0, signal: 'NEUTRAL' },
+    ];
+  }
+
+  updateAnalytics(): void {
+    if (this.allStocks.length === 0) return;
+    
+    this.updateSpreadOpportunities();
+    this.updateCorrelatedPairs();
+    this.updateMarketInefficiencies();
+    this.updateMarketStatistics();
+    this.updateTechnicalIndicators();
+  }
+
+  updateSpreadOpportunities(): void {
+    this.spreadOpportunities = this.allStocks
+      .filter(s => s.bid > 0 && s.ask > 0)
+      .map(s => {
+        const spread = s.ask - s.bid;
+        const spreadBps = (spread / s.price) * 10000;
+        let opportunity = 'LOW';
+        if (spreadBps > 10) opportunity = 'MEDIUM';
+        if (spreadBps > 25) opportunity = 'HIGH';
+        return { symbol: s.symbol, spread, spreadBps, opportunity };
+      })
+      .sort((a, b) => b.spreadBps - a.spreadBps)
+      .slice(0, 10);
+  }
+
+  updateCorrelatedPairs(): void {
+    this.correlatedPairs = this.correlatedPairs.map(pair => {
+      const [sym1, sym2] = pair.pair.split('/');
+      const stock1 = this.allStocks.find(s => s.symbol === sym1);
+      const stock2 = this.allStocks.find(s => s.symbol === sym2);
+      
+      if (!stock1 || !stock2) return pair;
+      
+      // Calculate divergence based on relative price changes
+      const change1 = stock1.changePercent || 0;
+      const change2 = stock2.changePercent || 0;
+      const expectedChange2 = change1 * pair.correlation;
+      const divergence = change2 - expectedChange2;
+      
+      let signal = 'NEUTRAL';
+      if (divergence > 0.5) signal = 'SELL_' + sym2;
+      if (divergence < -0.5) signal = 'BUY_' + sym2;
+      if (Math.abs(divergence) > 1.0) signal = 'STRONG_' + signal;
+      
+      return { ...pair, divergence: Math.round(divergence * 100) / 100, signal };
+    });
+  }
+
+  updateMarketInefficiencies(): void {
+    this.marketInefficiencies = [];
+    
+    this.allStocks.forEach(stock => {
+      // Check for momentum anomalies
+      if (Math.abs(stock.changePercent) > 3) {
+        this.marketInefficiencies.push({
+          symbol: stock.symbol,
+          type: stock.changePercent > 0 ? 'OVERBOUGHT' : 'OVERSOLD',
+          magnitude: Math.abs(stock.changePercent),
+          confidence: Math.min(95, 60 + Math.abs(stock.changePercent) * 5)
+        });
+      }
+      
+      // Check for unusual spread
+      const spreadBps = ((stock.ask - stock.bid) / stock.price) * 10000;
+      if (spreadBps > 20) {
+        this.marketInefficiencies.push({
+          symbol: stock.symbol,
+          type: 'WIDE_SPREAD',
+          magnitude: spreadBps,
+          confidence: Math.min(90, 50 + spreadBps)
+        });
+      }
+      
+      // Track historical spreads for volatility detection
+      if (!this.historicalSpreads.has(stock.symbol)) {
+        this.historicalSpreads.set(stock.symbol, []);
+      }
+      const history = this.historicalSpreads.get(stock.symbol)!;
+      history.push(spreadBps);
+      if (history.length > 60) history.shift(); // Keep last 60 samples
+    });
+    
+    // Sort by confidence
+    this.marketInefficiencies.sort((a, b) => b.confidence - a.confidence);
+    this.marketInefficiencies = this.marketInefficiencies.slice(0, 8);
+  }
+
+  updateMarketStatistics(): void {
+    this.totalMarketVolume = this.allStocks.reduce((sum, s) => sum + (s.volume || 0), 0);
+    
+    this.marketBreadth = {
+      advancers: this.allStocks.filter(s => s.change > 0).length,
+      decliners: this.allStocks.filter(s => s.change < 0).length,
+      unchanged: this.allStocks.filter(s => s.change === 0).length
+    };
+    
+    // Calculate sector performance
+    const sectorMap = new Map<string, {totalChange: number, count: number, volume: number}>();
+    this.allStocks.forEach(s => {
+      const current = sectorMap.get(s.sector) || {totalChange: 0, count: 0, volume: 0};
+      current.totalChange += s.changePercent || 0;
+      current.count++;
+      current.volume += s.volume || 0;
+      sectorMap.set(s.sector, current);
+    });
+    
+    this.sectorPerformance = Array.from(sectorMap.entries())
+      .map(([sector, data]) => ({
+        sector,
+        change: Math.round((data.totalChange / data.count) * 100) / 100,
+        volume: data.volume
+      }))
+      .sort((a, b) => b.change - a.change);
+  }
+
+  updateTechnicalIndicators(): void {
+    this.allStocks.forEach(stock => {
+      // Simplified VWAP calculation (in real system would use tick data)
+      const vwap = stock.price * 0.998 + (Math.random() - 0.5) * stock.price * 0.002;
+      this.vwapData.set(stock.symbol, Math.round(vwap * 100) / 100);
+      
+      // Simplified RSI (random walk around 50)
+      const currentRsi = this.rsiData.get(stock.symbol) || 50;
+      const rsiChange = (Math.random() - 0.5) * 5 + (stock.changePercent || 0) * 2;
+      const newRsi = Math.max(0, Math.min(100, currentRsi + rsiChange));
+      this.rsiData.set(stock.symbol, Math.round(newRsi));
+      
+      // Volatility (implied from spread)
+      const vol = ((stock.ask - stock.bid) / stock.price) * 100 * 16; // Annualized approximation
+      this.volatilityData.set(stock.symbol, Math.round(vol * 100) / 100);
+    });
+  }
+
+  getVwap(symbol: string): number {
+    return this.vwapData.get(symbol) || 0;
+  }
+
+  getRsi(symbol: string): number {
+    return this.rsiData.get(symbol) || 50;
+  }
+
+  getVolatility(symbol: string): number {
+    return this.volatilityData.get(symbol) || 0;
+  }
+
+  getRsiClass(rsi: number): string {
+    if (rsi >= 70) return 'rsi-overbought';
+    if (rsi <= 30) return 'rsi-oversold';
+    return 'rsi-neutral';
+  }
+
+  getSignalClass(signal: string): string {
+    if (signal.includes('BUY')) return 'signal-buy';
+    if (signal.includes('SELL')) return 'signal-sell';
+    return 'signal-neutral';
+  }
+
+  getOpportunityClass(opportunity: string): string {
+    if (opportunity === 'HIGH') return 'opportunity-high';
+    if (opportunity === 'MEDIUM') return 'opportunity-medium';
+    return 'opportunity-low';
+  }
+
+  formatVolume(vol: number): string {
+    if (vol >= 1000000000) return (vol / 1000000000).toFixed(1) + 'B';
+    if (vol >= 1000000) return (vol / 1000000).toFixed(1) + 'M';
+    if (vol >= 1000) return (vol / 1000).toFixed(1) + 'K';
+    return vol.toString();
   }
 }

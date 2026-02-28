@@ -10,6 +10,7 @@ export interface User {
   displayName: string;
   accountId: string;
   balance: number;
+  isAdmin?: boolean;
 }
 
 export interface LoginRequest {

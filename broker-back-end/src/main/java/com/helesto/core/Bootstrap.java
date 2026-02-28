@@ -8,9 +8,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.quarkus.runtime.ShutdownEvent;
+import io.quarkus.runtime.Startup;
 import io.quarkus.runtime.StartupEvent;
 
 @ApplicationScoped
+@Startup
 public class Bootstrap {
 
     private static final Logger LOG = LoggerFactory.getLogger(Bootstrap.class.getName());
