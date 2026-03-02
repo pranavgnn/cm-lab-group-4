@@ -333,46 +333,129 @@
     </div>
   </section>
   
-  <!-- Order Book Visualization -->
+  <!-- Order Book Visualization - Enhanced -->
   <section class="orderbook-section">
-    <div class="panel">
-      <div class="panel-header">
-        <h2>📊 Live Order Book - {{ selectedOrderBookSymbol }}</h2>
-        <select [(ngModel)]="selectedOrderBookSymbol" (ngModelChange)="onOrderBookSymbolChange()">
-          <optgroup *ngFor="let cat of getOrderBookCategories()" [label]="cat.name">
-            <option *ngFor="let stock of cat.stocks" [value]="stock.symbol">{{ stock.symbol }} - {{ stock.name }}</option>
-          </optgroup>
-        </select>
+    <div class="orderbook-main-panel">
+      <div class="panel-header orderbook-header">
+        <div class="header-left">
+          <h2>📊 Live Order Book</h2>
+          <select class="symbol-select" [(ngModel)]="selectedOrderBookSymbol" (ngModelChange)="onOrderBookSymbolChange()">
+            <optgroup *ngFor="let cat of getOrderBookCategories()" [label]="cat.name">
+              <option *ngFor="let stock of cat.stocks" [value]="stock.symbol">{{ stock.symbol }} - {{ stock.name }}</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="header-right">
+          <div class="quick-stats">
+            <div class="stat">
+              <span class="label">Last</span>
+              <span class="value">${{ getMidPrice() | number:'1.2-2' }}</span>
+            </div>
+            <div class="stat" [class.positive]="getSpreadPercent() < 0.1" [class.warning]="getSpreadPercent() >= 0.1">
+              <span class="label">Spread</span>
+              <span class="value">{{ getSpreadPercent() | number:'1.3-3' }}%</span>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="orderbook-container">
-        <div class="orderbook-side bids">
-          <div class="orderbook-title">BIDS (Buy Orders)</div>
-          <div class="orderbook-row" *ngFor="let bid of generateOrderBook().bids; let i = index">
-            <div class="orderbook-bar bid" [style.width.%]="bid.percent"></div>
-            <span class="orderbook-size">{{ bid.size | number }}</span>
-            <span class="orderbook-price">${{ bid.price | number:'1.2-2' }}</span>
-            <span class="orderbook-total">${{ bid.total | number:'1.0-0' }}</span>
+      
+      <div class="orderbook-layout">
+        <!-- Bids Side -->
+        <div class="orderbook-side bids-side">
+          <div class="orderbook-title-bar">
+            <span class="title">BIDS</span>
+            <span class="subtitle">Buy Orders</span>
+          </div>
+          <div class="orderbook-header-row">
+            <span>Size</span>
+            <span>Price</span>
+            <span>Total</span>
+          </div>
+          <div class="orderbook-rows">
+            <div class="orderbook-row bid-row" *ngFor="let bid of cachedOrderBook.bids; let i = index" 
+                 [style.--bar-width]="bid.percent + '%'">
+              <span class="size">{{ bid.size | number }}</span>
+              <span class="price">${{ bid.price | number:'1.2-2' }}</span>
+              <span class="total">${{ bid.total | number:'1.0-0' }}</span>
+              <div class="depth-bar bid-bar"></div>
+            </div>
           </div>
         </div>
-        <div class="orderbook-spread">
-          <div class="spread-info">
-            <span class="spread-label">Spread</span>
-            <span class="spread-value">${{ getOrderBookSpread() | number:'1.2-2' }}</span>
-            <span class="spread-percent">({{ getSpreadPercent() | number:'1.3-3' }}%)</span>
+        
+        <!-- Center Spread Panel -->
+        <div class="spread-panel">
+          <div class="spread-box">
+            <div class="spread-value-box">
+              <span class="spread-label">SPREAD</span>
+              <span class="spread-amount">${{ getOrderBookSpread() | number:'1.2-2' }}</span>
+              <span class="spread-bps">({{ getSpreadPercent() * 100 | number:'1.2-2' }} bps)</span>
+            </div>
+            <div class="mid-price-box">
+              <span class="mid-label">MID PRICE</span>
+              <span class="mid-amount">${{ getMidPrice() | number:'1.2-2' }}</span>
+            </div>
           </div>
-          <div class="mid-price">
-            <span class="mid-label">Mid Price</span>
-            <span class="mid-value">${{ getMidPrice() | number:'1.2-2' }}</span>
+          
+          <!-- Quick Trade Buttons -->
+          <div class="quick-trade-section">
+            <div class="quick-trade-title">Quick Trade</div>
+            <div class="quick-buttons buy-buttons">
+              <button *ngFor="let size of quickSizes" class="quick-btn buy" (click)="quickBuy(size)">
+                BUY {{ size }}
+              </button>
+            </div>
+            <div class="quick-buttons sell-buttons">
+              <button *ngFor="let size of quickSizes" class="quick-btn sell" (click)="quickSell(size)">
+                SELL {{ size }}
+              </button>
+            </div>
           </div>
         </div>
-        <div class="orderbook-side asks">
-          <div class="orderbook-title">ASKS (Sell Orders)</div>
-          <div class="orderbook-row" *ngFor="let ask of generateOrderBook().asks; let i = index">
-            <div class="orderbook-bar ask" [style.width.%]="ask.percent"></div>
-            <span class="orderbook-price">${{ ask.price | number:'1.2-2' }}</span>
-            <span class="orderbook-size">{{ ask.size | number }}</span>
-            <span class="orderbook-total">${{ ask.total | number:'1.0-0' }}</span>
+        
+        <!-- Asks Side -->
+        <div class="orderbook-side asks-side">
+          <div class="orderbook-title-bar asks-title">
+            <span class="title">ASKS</span>
+            <span class="subtitle">Sell Orders</span>
           </div>
+          <div class="orderbook-header-row">
+            <span>Price</span>
+            <span>Size</span>
+            <span>Total</span>
+          </div>
+          <div class="orderbook-rows">
+            <div class="orderbook-row ask-row" *ngFor="let ask of cachedOrderBook.asks; let i = index"
+                 [style.--bar-width]="ask.percent + '%'">
+              <span class="price">${{ ask.price | number:'1.2-2' }}</span>
+              <span class="size">{{ ask.size | number }}</span>
+              <span class="total">${{ ask.total | number:'1.0-0' }}</span>
+              <div class="depth-bar ask-bar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Time & Sales Panel -->
+    <div class="time-sales-panel">
+      <div class="panel-header">
+        <h3>⏱️ Time & Sales</h3>
+      </div>
+      <div class="time-sales-header">
+        <span>Time</span>
+        <span>Price</span>
+        <span>Size</span>
+      </div>
+      <div class="time-sales-rows">
+        <div class="time-sales-row" *ngFor="let trade of timeSales" 
+             [class.buy-trade]="trade.side === 'BUY'" 
+             [class.sell-trade]="trade.side === 'SELL'">
+          <span class="time">{{ trade.time | date:'HH:mm:ss' }}</span>
+          <span class="price">${{ trade.price | number:'1.2-2' }}</span>
+          <span class="size">{{ trade.size | number }}</span>
+        </div>
+        <div class="empty-trades" *ngIf="timeSales.length === 0">
+          <span>No recent trades</span>
         </div>
       </div>
     </div>
@@ -519,19 +602,19 @@
         <div class="indicator-grid">
           <div class="indicator-item">
             <span class="ind-label">VWAP</span>
-            <span class="ind-value">${{ getVwap(selectedOrderBookSymbol) | number:'1.2-2' }}</span>
+            <span class="ind-value">${{ currentVwap | number:'1.2-2' }}</span>
           </div>
-          <div class="indicator-item" [class]="getRsiClass(getRsi(selectedOrderBookSymbol))">
+          <div class="indicator-item" [class]="getRsiClass(currentRsi)">
             <span class="ind-label">RSI (14)</span>
-            <span class="ind-value">{{ getRsi(selectedOrderBookSymbol) }}</span>
+            <span class="ind-value">{{ currentRsi }}</span>
           </div>
           <div class="indicator-item">
             <span class="ind-label">IV (Ann.)</span>
-            <span class="ind-value">{{ getVolatility(selectedOrderBookSymbol) }}%</span>
+            <span class="ind-value">{{ currentVolatility }}%</span>
           </div>
           <div class="indicator-item">
             <span class="ind-label">Spread</span>
-            <span class="ind-value">{{ (getSpreadPercent() * 100) | number:'1.2-2' }} bps</span>
+            <span class="ind-value">{{ currentSpread | number:'1.2-2' }} bps</span>
           </div>
         </div>
         <div class="rsi-gauge">
@@ -541,13 +624,125 @@
               <div class="zone neutral"></div>
               <div class="zone overbought"></div>
             </div>
-            <div class="gauge-needle" [style.left.%]="getRsi(selectedOrderBookSymbol)"></div>
+            <div class="gauge-needle" [style.left.%]="currentRsi"></div>
           </div>
           <div class="gauge-labels">
             <span>Oversold</span>
             <span>Neutral</span>
             <span>Overbought</span>
           </div>
+        </div>
+      </div>
+
+      <!-- G4-M4: Options Pricing Engine -->
+      <div class="analytics-card options-pricing">
+        <div class="card-header">
+          <h3>📊 Options Pricing Engine</h3>
+          <span class="card-subtitle">Black-Scholes Calculator</span>
+        </div>
+        <div class="options-controls">
+          <div class="option-input-row">
+            <div class="option-input">
+              <label>Symbol</label>
+              <select [(ngModel)]="optionsPricing.symbol" (change)="updateOptionPrice()">
+                <option *ngFor="let stock of allStocks" [value]="stock.symbol">{{ stock.symbol }}</option>
+              </select>
+            </div>
+            <div class="option-input">
+              <label>Type</label>
+              <select [(ngModel)]="optionsPricing.optionType" (change)="updateOptionPrice()">
+                <option value="CALL">CALL</option>
+                <option value="PUT">PUT</option>
+              </select>
+            </div>
+          </div>
+          <div class="option-input-row">
+            <div class="option-input">
+              <label>Spot Price ($)</label>
+              <input type="number" [(ngModel)]="optionsPricing.spotPrice" step="0.01" readonly>
+            </div>
+            <div class="option-input">
+              <label>Strike Price ($)</label>
+              <input type="number" [(ngModel)]="optionsPricing.strikePrice" step="1" (change)="updateOptionPrice()">
+            </div>
+          </div>
+          <div class="option-input-row">
+            <div class="option-input">
+              <label>Time to Expiry (days)</label>
+              <input type="number" [(ngModel)]="optionsPricing.daysToExpiry" min="1" max="365" (change)="updateOptionPrice()">
+            </div>
+            <div class="option-input">
+              <label>Volatility (%)</label>
+              <input type="number" [(ngModel)]="optionsPricing.volatility" step="1" min="1" max="200" (change)="updateOptionPrice()">
+            </div>
+          </div>
+          <div class="option-input-row">
+            <div class="option-input">
+              <label>Risk-Free Rate (%)</label>
+              <input type="number" [(ngModel)]="optionsPricing.riskFreeRate" step="0.1" min="0" (change)="updateOptionPrice()">
+            </div>
+            <div class="option-input fair-price">
+              <label>Fair Price ($)</label>
+              <span class="price-value">${{ optionsPricing.fairPrice | number:'1.4-4' }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="greeks-display">
+          <div class="greeks-header">Greeks</div>
+          <div class="greeks-grid">
+            <div class="greek-item">
+              <span class="greek-label">Delta (Δ)</span>
+              <span class="greek-value" [class.positive]="optionsPricing.greeks.delta >= 0" [class.negative]="optionsPricing.greeks.delta < 0">
+                {{ optionsPricing.greeks.delta | number:'1.4-4' }}
+              </span>
+            </div>
+            <div class="greek-item">
+              <span class="greek-label">Gamma (Γ)</span>
+              <span class="greek-value">{{ optionsPricing.greeks.gamma | number:'1.6-6' }}</span>
+            </div>
+            <div class="greek-item">
+              <span class="greek-label">Theta (Θ)</span>
+              <span class="greek-value negative">{{ optionsPricing.greeks.theta | number:'1.4-4' }}/day</span>
+            </div>
+            <div class="greek-item">
+              <span class="greek-label">Vega (ν)</span>
+              <span class="greek-value">{{ optionsPricing.greeks.vega | number:'1.4-4' }}</span>
+            </div>
+            <div class="greek-item">
+              <span class="greek-label">Rho (ρ)</span>
+              <span class="greek-value">{{ optionsPricing.greeks.rho | number:'1.4-4' }}</span>
+            </div>
+            <div class="greek-item moneyness">
+              <span class="greek-label">Moneyness</span>
+              <span class="greek-value" [class]="getMoneyessClass()">{{ getMoneyness() }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="options-chain" *ngIf="optionsChain.length > 0">
+          <div class="chain-header">
+            <span>Options Chain for {{ optionsPricing.symbol }}</span>
+            <button class="btn-refresh-chain" (click)="loadOptionsChain()">↻</button>
+          </div>
+          <table class="chain-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Strike</th>
+                <th>Price</th>
+                <th>Delta</th>
+                <th>IV</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let option of optionsChain" [class.selected]="option.strike === optionsPricing.strikePrice && option.type === optionsPricing.optionType">
+                <td [class]="option.type === 'CALL' ? 'call' : 'put'">{{ option.type }}</td>
+                <td>${{ option.strike | number:'1.2-2' }}</td>
+                <td>${{ option.price | number:'1.2-2' }}</td>
+                <td>{{ option.delta | number:'1.3-3' }}</td>
+                <td>{{ option.iv | number:'1.1-1' }}%</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

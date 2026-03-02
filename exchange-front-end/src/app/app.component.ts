@@ -98,6 +98,25 @@ export class AppComponent implements OnInit, OnDestroy {
   selectedOrderBookSymbol = 'AAPL';
   systemHealth = { healthy: true };
   
+  // Cached Order Book Data (fixes flickering)
+  cachedOrderBook: { bids: any[], asks: any[] } = { bids: [], asks: [] };
+  orderBookLoading = false;
+  
+  // Real-time Trade Ticker
+  recentTrades: { symbol: string, price: number, qty: number, side: string, time: Date }[] = [];
+  
+  // Volume Profile
+  volumeProfile: { price: number, buyVolume: number, sellVolume: number }[] = [];
+  
+  // Quick Trade Sizes
+  quickSizes = [100, 500, 1000, 5000];
+  
+  // Time & Sales
+  timeSales: { time: Date, price: number, size: number, side: string }[] = [];
+  
+  // Market Depth (for chart)
+  depthData: { bids: {price: number, total: number}[], asks: {price: number, total: number}[] } = { bids: [], asks: [] };
+  
   // Arbitrage & Spread Analysis
   spreadOpportunities: {symbol: string, spread: number, spreadBps: number, opportunity: string}[] = [];
   correlatedPairs: {pair: string, correlation: number, divergence: number, signal: string}[] = [];
@@ -108,6 +127,12 @@ export class AppComponent implements OnInit, OnDestroy {
   vwapData: Map<string, number> = new Map();
   rsiData: Map<string, number> = new Map();
   volatilityData: Map<string, number> = new Map();
+  
+  // Current symbol indicators (for change detection)
+  currentVwap = 0;
+  currentRsi = 50;
+  currentVolatility = 0;
+  currentSpread = 0;
   
   // Market Statistics
   totalMarketVolume = 0;
@@ -125,6 +150,26 @@ export class AppComponent implements OnInit, OnDestroy {
     orderType: 'LIMIT',
     timeInForce: 'DAY'
   };
+  
+  // G4-M4: Options Pricing UI
+  optionsPricing = {
+    symbol: 'AAPL',
+    optionType: 'CALL',
+    spotPrice: 178.50,
+    strikePrice: 180,
+    daysToExpiry: 30,
+    volatility: 25,
+    riskFreeRate: 5,
+    fairPrice: 0,
+    greeks: {
+      delta: 0,
+      gamma: 0,
+      theta: 0,
+      vega: 0,
+      rho: 0
+    }
+  };
+  optionsChain: {type: string, strike: number, price: number, delta: number, iv: number}[] = [];
   
   private pollingSubscription?: Subscription;
   private marketDataSubscription?: Subscription;
@@ -144,8 +189,25 @@ export class AppComponent implements OnInit, OnDestroy {
       this.updateAnalytics();
     }, 1000);
     
+    // Refresh order book every 500ms 
+    setInterval(() => {
+      this.refreshOrderBook();
+    }, 500);
+    
     // Initialize correlated pairs for arbitrage monitoring
     this.initializeCorrelatedPairs();
+    
+    // Initialize order book
+    setTimeout(() => {
+      this.refreshOrderBook();
+      this.loadRecentTrades();
+    }, 500);
+    
+    // Initialize options pricing after a short delay for market data to load
+    setTimeout(() => {
+      this.updateOptionPrice();
+      this.loadOptionsChain();
+    }, 1500);
   }
   
   ngOnDestroy(): void {
@@ -532,18 +594,67 @@ export class AppComponent implements OnInit, OnDestroy {
   
   // Order Book Methods
   onOrderBookSymbolChange(): void {
-    // Refresh order book for new symbol - no action needed as generateOrderBook uses selectedOrderBookSymbol
+    // Update technical indicators for new symbol
     console.log('Order book symbol changed to:', this.selectedOrderBookSymbol);
-  }
-
-  getOrderBookCategories(): StockCategory[] {
-    // Return categories with only EQUITY stocks for the order book dropdown
-    return this.stockCategories.filter(cat => cat.stocks.length > 0);
+    this.updateCurrentIndicators();
+    // Also update new order form symbol
+    this.newOrder.symbol = this.selectedOrderBookSymbol;
+    // Refresh order book immediately
+    this.refreshOrderBook();
+    this.loadRecentTrades();
   }
   
-  generateOrderBook(): { bids: any[], asks: any[] } {
-    const stock = this.allStocks.find(s => s.symbol === this.selectedOrderBookSymbol);
+  refreshOrderBook(): void {
+    const symbol = this.selectedOrderBookSymbol;
+    const stock = this.allStocks.find(s => s.symbol === symbol);
     const midPrice = stock?.price || 175;
+    
+    // Try to fetch real order book from API
+    this.http.get<any>(`/api/marketdata/orderbook/${symbol}?depth=10`)
+      .pipe(catchError(() => of(null)))
+      .subscribe(response => {
+        if (response && response.bids && response.bids.length > 0) {
+          // Use real order book data
+          this.cachedOrderBook = this.formatApiOrderBook(response, midPrice);
+        } else {
+          // Generate simulated order book for this symbol
+          this.cachedOrderBook = this.generateSimulatedOrderBook(symbol, midPrice);
+        }
+        this.updateDepthChart();
+      });
+  }
+  
+  formatApiOrderBook(response: any, midPrice: number): { bids: any[], asks: any[] } {
+    let cumBidSize = 0;
+    let cumAskSize = 0;
+    
+    const bids = (response.bids || []).slice(0, 8).map((level: any) => {
+      cumBidSize += level.totalQuantity || level.size || 0;
+      return {
+        price: level.price,
+        size: level.totalQuantity || level.size || 0,
+        total: cumBidSize * level.price,
+        percent: Math.min(100, (level.totalQuantity || level.size || 0) / 5)
+      };
+    });
+    
+    const asks = (response.asks || []).slice(0, 8).map((level: any) => {
+      cumAskSize += level.totalQuantity || level.size || 0;
+      return {
+        price: level.price,
+        size: level.totalQuantity || level.size || 0,
+        total: cumAskSize * level.price,
+        percent: Math.min(100, (level.totalQuantity || level.size || 0) / 5)
+      };
+    });
+    
+    return { bids, asks };
+  }
+  
+  generateSimulatedOrderBook(symbol: string, midPrice: number): { bids: any[], asks: any[] } {
+    // Use symbol hash to generate consistent order book
+    const hash = symbol.split('').reduce((a, b) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0);
+    const seed = Math.abs(hash) % 1000;
     
     const bids = [];
     const asks = [];
@@ -551,8 +662,9 @@ export class AppComponent implements OnInit, OnDestroy {
     let cumAskSize = 0;
     
     for (let i = 0; i < 8; i++) {
-      const bidSize = Math.floor(Math.random() * 500) + 100;
-      const askSize = Math.floor(Math.random() * 500) + 100;
+      // Use seeded pseudo-random for consistent results per symbol
+      const bidSize = ((seed * (i + 1) * 17) % 500) + 100;
+      const askSize = ((seed * (i + 1) * 23) % 500) + 100;
       cumBidSize += bidSize;
       cumAskSize += askSize;
       
@@ -572,6 +684,82 @@ export class AppComponent implements OnInit, OnDestroy {
     }
     
     return { bids, asks };
+  }
+  
+  updateDepthChart(): void {
+    // Calculate cumulative depth for chart visualization
+    let bidTotal = 0;
+    let askTotal = 0;
+    
+    this.depthData.bids = this.cachedOrderBook.bids.map(b => {
+      bidTotal += b.size;
+      return { price: b.price, total: bidTotal };
+    }).reverse();
+    
+    this.depthData.asks = this.cachedOrderBook.asks.map(a => {
+      askTotal += a.size;
+      return { price: a.price, total: askTotal };
+    });
+  }
+  
+  loadRecentTrades(): void {
+    const symbol = this.selectedOrderBookSymbol;
+    this.http.get<any[]>(`/api/marketdata/trades/${symbol}`)
+      .pipe(catchError(() => of([])))
+      .subscribe(trades => {
+        this.recentTrades = (trades || []).slice(0, 20).map(t => ({
+          symbol: t.symbol || symbol,
+          price: t.price,
+          qty: t.quantity,
+          side: t.aggressorSide || 'BUY',
+          time: new Date(t.createdAt || Date.now())
+        }));
+        
+        // Also update time & sales
+        this.timeSales = this.recentTrades.slice(0, 10).map(t => ({
+          time: t.time,
+          price: t.price,
+          size: t.qty,
+          side: t.side
+        }));
+      });
+  }
+  
+  // Quick trade functions
+  quickBuy(size: number): void {
+    this.newOrder.side = '1';
+    this.newOrder.quantity = size;
+    this.submitOrder();
+  }
+  
+  quickSell(size: number): void {
+    this.newOrder.side = '2';
+    this.newOrder.quantity = size;
+    this.submitOrder();
+  }
+  
+  updateCurrentIndicators(): void {
+    const symbol = this.selectedOrderBookSymbol;
+    this.currentVwap = this.vwapData.get(symbol) || 0;
+    this.currentRsi = this.rsiData.get(symbol) || 50;
+    this.currentVolatility = this.volatilityData.get(symbol) || 0;
+    
+    const stock = this.allStocks.find(s => s.symbol === symbol);
+    if (stock && stock.bid > 0 && stock.ask > 0) {
+      this.currentSpread = ((stock.ask - stock.bid) / stock.price) * 10000;
+    } else {
+      this.currentSpread = 0;
+    }
+  }
+
+  getOrderBookCategories(): StockCategory[] {
+    // Return categories with only EQUITY stocks for the order book dropdown
+    return this.stockCategories.filter(cat => cat.stocks.length > 0);
+  }
+  
+  generateOrderBook(): { bids: any[], asks: any[] } {
+    // Return cached order book data (refreshed via refreshOrderBook)
+    return this.cachedOrderBook;
   }
   
   getOrderBookSpread(): number {
@@ -736,6 +924,9 @@ export class AppComponent implements OnInit, OnDestroy {
       const vol = ((stock.ask - stock.bid) / stock.price) * 100 * 16; // Annualized approximation
       this.volatilityData.set(stock.symbol, Math.round(vol * 100) / 100);
     });
+    
+    // Update current indicators for selected symbol
+    this.updateCurrentIndicators();
   }
 
   getVwap(symbol: string): number {
@@ -773,5 +964,169 @@ export class AppComponent implements OnInit, OnDestroy {
     if (vol >= 1000000) return (vol / 1000000).toFixed(1) + 'M';
     if (vol >= 1000) return (vol / 1000).toFixed(1) + 'K';
     return vol.toString();
+  }
+
+  // ================== G4-M4: Options Pricing Methods ==================
+
+  updateOptionPrice(): void {
+    // Update spot price from market data
+    const stock = this.allStocks.find(s => s.symbol === this.optionsPricing.symbol);
+    if (stock) {
+      this.optionsPricing.spotPrice = stock.price;
+    }
+    
+    // Call API to get option price
+    const params = {
+      spot: this.optionsPricing.spotPrice,
+      strike: this.optionsPricing.strikePrice,
+      timeToExpiry: this.optionsPricing.daysToExpiry / 365,
+      riskFreeRate: this.optionsPricing.riskFreeRate / 100,
+      volatility: this.optionsPricing.volatility / 100,
+      isCall: this.optionsPricing.optionType === 'CALL'
+    };
+    
+    this.http.get<any>('/api/options/price', { params: params as any })
+      .pipe(catchError(() => of(null)))
+      .subscribe(result => {
+        if (result) {
+          this.optionsPricing.fairPrice = result.price || 0;
+          if (result.greeks) {
+            this.optionsPricing.greeks = {
+              delta: result.greeks.delta || 0,
+              gamma: result.greeks.gamma || 0,
+              theta: result.greeks.theta || 0,
+              vega: result.greeks.vega || 0,
+              rho: result.greeks.rho || 0
+            };
+          }
+        } else {
+          // Calculate locally as fallback
+          this.calculateOptionPriceLocally();
+        }
+      });
+  }
+
+  calculateOptionPriceLocally(): void {
+    const S = this.optionsPricing.spotPrice;
+    const K = this.optionsPricing.strikePrice;
+    const T = this.optionsPricing.daysToExpiry / 365;
+    const r = this.optionsPricing.riskFreeRate / 100;
+    const sigma = this.optionsPricing.volatility / 100;
+    const isCall = this.optionsPricing.optionType === 'CALL';
+    
+    // Black-Scholes calculation
+    const d1 = (Math.log(S / K) + (r + sigma * sigma / 2) * T) / (sigma * Math.sqrt(T));
+    const d2 = d1 - sigma * Math.sqrt(T);
+    
+    const Nd1 = this.normalCDF(d1);
+    const Nd2 = this.normalCDF(d2);
+    const Nnd1 = this.normalCDF(-d1);
+    const Nnd2 = this.normalCDF(-d2);
+    
+    if (isCall) {
+      this.optionsPricing.fairPrice = S * Nd1 - K * Math.exp(-r * T) * Nd2;
+      this.optionsPricing.greeks.delta = Nd1;
+    } else {
+      this.optionsPricing.fairPrice = K * Math.exp(-r * T) * Nnd2 - S * Nnd1;
+      this.optionsPricing.greeks.delta = Nd1 - 1;
+    }
+    
+    // Calculate other Greeks
+    const sqrtT = Math.sqrt(T);
+    const discount = Math.exp(-r * T);
+    const npd1 = this.normalPDF(d1);
+    
+    this.optionsPricing.greeks.gamma = npd1 / (S * sigma * sqrtT);
+    this.optionsPricing.greeks.vega = S * npd1 * sqrtT / 100;
+    this.optionsPricing.greeks.theta = isCall
+      ? (-S * npd1 * sigma / (2 * sqrtT) - r * K * discount * Nd2) / 365
+      : (-S * npd1 * sigma / (2 * sqrtT) + r * K * discount * Nnd2) / 365;
+    this.optionsPricing.greeks.rho = isCall
+      ? K * T * discount * Nd2 / 100
+      : -K * T * discount * Nnd2 / 100;
+  }
+
+  normalCDF(x: number): number {
+    const a1 =  0.254829592;
+    const a2 = -0.284496736;
+    const a3 =  1.421413741;
+    const a4 = -1.453152027;
+    const a5 =  1.061405429;
+    const p  =  0.3275911;
+    
+    const sign = x < 0 ? -1 : 1;
+    x = Math.abs(x) / Math.sqrt(2);
+    
+    const t = 1.0 / (1.0 + p * x);
+    const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+    
+    return 0.5 * (1.0 + sign * y);
+  }
+
+  normalPDF(x: number): number {
+    return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+  }
+
+  loadOptionsChain(): void {
+    const stock = this.allStocks.find(s => s.symbol === this.optionsPricing.symbol);
+    if (!stock) return;
+    
+    const spotPrice = stock.price;
+    const chain: {type: string, strike: number, price: number, delta: number, iv: number}[] = [];
+    
+    // Generate strikes around spot price
+    const strikeStep = Math.max(1, Math.round(spotPrice / 20));
+    const minStrike = Math.floor(spotPrice * 0.85 / strikeStep) * strikeStep;
+    const maxStrike = Math.ceil(spotPrice * 1.15 / strikeStep) * strikeStep;
+    
+    for (let strike = minStrike; strike <= maxStrike; strike += strikeStep) {
+      for (const type of ['CALL', 'PUT']) {
+        const isCall = type === 'CALL';
+        const T = this.optionsPricing.daysToExpiry / 365;
+        const r = this.optionsPricing.riskFreeRate / 100;
+        const sigma = this.optionsPricing.volatility / 100;
+        
+        const d1 = (Math.log(spotPrice / strike) + (r + sigma * sigma / 2) * T) / (sigma * Math.sqrt(T));
+        const d2 = d1 - sigma * Math.sqrt(T);
+        
+        let price, delta;
+        if (isCall) {
+          price = spotPrice * this.normalCDF(d1) - strike * Math.exp(-r * T) * this.normalCDF(d2);
+          delta = this.normalCDF(d1);
+        } else {
+          price = strike * Math.exp(-r * T) * this.normalCDF(-d2) - spotPrice * this.normalCDF(-d1);
+          delta = this.normalCDF(d1) - 1;
+        }
+        
+        chain.push({
+          type: type,
+          strike: strike,
+          price: Math.max(0, price),
+          delta: delta,
+          iv: this.optionsPricing.volatility
+        });
+      }
+    }
+    
+    this.optionsChain = chain.sort((a, b) => a.strike - b.strike || (a.type === 'CALL' ? -1 : 1));
+  }
+
+  getMoneyness(): string {
+    const ratio = this.optionsPricing.spotPrice / this.optionsPricing.strikePrice;
+    const isCall = this.optionsPricing.optionType === 'CALL';
+    
+    if (Math.abs(ratio - 1) < 0.02) return 'ATM';
+    if (isCall) {
+      return ratio > 1 ? 'ITM' : 'OTM';
+    } else {
+      return ratio < 1 ? 'ITM' : 'OTM';
+    }
+  }
+
+  getMoneyessClass(): string {
+    const moneyness = this.getMoneyness();
+    if (moneyness === 'ITM') return 'itm';
+    if (moneyness === 'OTM') return 'otm';
+    return 'atm';
   }
 }

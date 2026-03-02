@@ -30,6 +30,7 @@ public class OrderEntity {
     private Long leavesQty;
     private Double avgPrice;
     private String rejectReason;
+    private String previousStatus;
     private Long userId;
     private String accountId;
     
@@ -170,6 +171,14 @@ public class OrderEntity {
     
     public void setRejectReason(String rejectReason) {
         this.rejectReason = rejectReason;
+    }
+    
+    public String getPreviousStatus() {
+        return previousStatus;
+    }
+    
+    public void setPreviousStatus(String previousStatus) {
+        this.previousStatus = previousStatus;
     }
     
     public Long getUserId() {

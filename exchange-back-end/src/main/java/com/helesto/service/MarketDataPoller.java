@@ -44,6 +44,9 @@ public class MarketDataPoller {
     @Inject
     WebSocketAggregator webSocketAggregator;
     
+    @Inject
+    TelemetryService telemetryService;
+    
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final Map<String, MarketDataSnapshot> lastSnapshots = new ConcurrentHashMap<>();
     private final List<MarketDataListener> listeners = new CopyOnWriteArrayList<>();
@@ -246,12 +249,16 @@ public class MarketDataPoller {
                     lastSnapshots.put(symbol, snapshot);
                     notifyListeners(snapshot);
                     
+                    // Record telemetry
+                    telemetryService.recordMarketDataUpdate(symbol);
+                    
                     // Broadcast via WebSocket
                     try {
                         webSocketAggregator.broadcastMarketData(
                             symbol, newPrice, snapshot.bid, snapshot.ask, 
                             snapshot.change, snapshot.changePercent
                         );
+                        telemetryService.recordMarketDataBroadcast();
                     } catch (Exception e) {
                         // WebSocket may not be initialized yet
                     }
@@ -359,6 +366,75 @@ public class MarketDataPoller {
     
     public void removeListener(MarketDataListener listener) {
         listeners.remove(listener);
+    }
+    
+    /**
+     * G3-M4: Update price from trade execution
+     * - Updates the last price when a trade executes
+     * - Recalculates derived values (bid/ask spread, change)
+     * - Broadcasts update to subscribers
+     */
+    public void updatePriceFromTrade(String symbol, double tradePrice, long tradeQuantity) {
+        if (symbol == null || tradePrice <= 0) {
+            LOG.warn("Invalid trade update: symbol={}, price={}", symbol, tradePrice);
+            return;
+        }
+        
+        Double basePrice = basePrices.get(symbol);
+        if (basePrice == null) {
+            // Add new symbol with trade price as base
+            basePrices.put(symbol, tradePrice);
+            basePrice = tradePrice;
+        }
+        
+        MarketDataSnapshot last = lastSnapshots.get(symbol);
+        double openPrice = last != null ? last.open : basePrice;
+        
+        // Calculate spread based on price level
+        double spreadPercent = 0.0001 + (random.nextDouble() * 0.0003);
+        double halfSpread = tradePrice * spreadPercent;
+        
+        // Create updated snapshot
+        MarketDataSnapshot snapshot = new MarketDataSnapshot();
+        snapshot.symbol = symbol;
+        snapshot.lastPrice = Math.round(tradePrice * 100.0) / 100.0;
+        snapshot.bid = Math.round((tradePrice - halfSpread) * 100.0) / 100.0;
+        snapshot.ask = Math.round((tradePrice + halfSpread) * 100.0) / 100.0;
+        snapshot.open = openPrice;
+        snapshot.high = last != null ? Math.max(last.high, tradePrice) : tradePrice;
+        snapshot.low = last != null ? Math.min(last.low, tradePrice) : tradePrice;
+        snapshot.change = Math.round((tradePrice - openPrice) * 100.0) / 100.0;
+        snapshot.changePercent = openPrice > 0 ? Math.round(((tradePrice - openPrice) / openPrice * 100) * 100.0) / 100.0 : 0;
+        snapshot.volume = last != null ? last.volume + tradeQuantity : tradeQuantity;
+        snapshot.timestamp = System.currentTimeMillis();
+        
+        // Store and notify
+        lastSnapshots.put(symbol, snapshot);
+        notifyListeners(snapshot);
+        
+        // Broadcast via WebSocket
+        try {
+            webSocketAggregator.broadcastMarketData(
+                symbol, snapshot.lastPrice, snapshot.bid, snapshot.ask,
+                snapshot.change, snapshot.changePercent
+            );
+        } catch (Exception e) {
+            LOG.debug("Could not broadcast trade price update: {}", e.getMessage());
+        }
+        
+        LOG.debug("Updated price from trade: {} @ {} qty={}", symbol, tradePrice, tradeQuantity);
+    }
+    
+    /**
+     * Get current price for a symbol
+     */
+    public double getCurrentPrice(String symbol) {
+        MarketDataSnapshot snapshot = lastSnapshots.get(symbol);
+        if (snapshot != null) {
+            return snapshot.lastPrice;
+        }
+        Double basePrice = basePrices.get(symbol);
+        return basePrice != null ? basePrice : 0;
     }
     
     // ================== Inner Classes ==================

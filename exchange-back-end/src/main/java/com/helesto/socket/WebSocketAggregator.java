@@ -1,20 +1,37 @@
 package com.helesto.socket;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.helesto.model.OrderEntity;
-import com.helesto.model.TradeEntity;
-import com.helesto.service.*;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
-import javax.websocket.*;
+import javax.websocket.OnClose;
+import javax.websocket.OnError;
+import javax.websocket.OnMessage;
+import javax.websocket.OnOpen;
+import javax.websocket.Session;
 import javax.websocket.server.ServerEndpoint;
-import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.helesto.model.OrderEntity;
+import com.helesto.model.TradeEntity;
+import com.helesto.service.OrderBookManager;
+import com.helesto.service.ReferenceDataService;
+import com.helesto.service.TelemetryService;
+import com.helesto.service.TradeService;
 
 /**
  * G4-M1: WebSocket Aggregator Gateway
@@ -40,11 +57,17 @@ public class WebSocketAggregator {
     private final Map<Session, List<Message>> pendingMessages = new ConcurrentHashMap<>();
     private static final long BATCH_INTERVAL_MS = 50; // 50ms batching
     
+    // G2-M5: Trade replay configuration
+    private static final int TRADE_REPLAY_COUNT = 50; // Number of trades to replay on reconnect
+    
     @Inject
     ReferenceDataService referenceDataService;
     
     @Inject
     TradeService tradeService;
+    
+    @Inject
+    TelemetryService telemetryService;
     
     public WebSocketAggregator() {
         // Start batch sender
@@ -59,9 +82,16 @@ public class WebSocketAggregator {
         pendingMessages.put(session, new CopyOnWriteArrayList<>());
         LOG.info("WebSocket client connected: {}", session.getId());
         
-        // Send welcome message
+        // Record telemetry
+        if (telemetryService != null) {
+            telemetryService.recordWsConnection(true);
+        }
+        
+        // Send welcome message with replay capability notification
         sendDirect(session, new Message("CONNECTED", Map.of(
             "sessionId", session.getId(),
+            "tradeReplayAvailable", true,
+            "tradeReplayCount", TRADE_REPLAY_COUNT,
             "timestamp", System.currentTimeMillis()
         )));
     }
@@ -72,6 +102,11 @@ public class WebSocketAggregator {
         subscriptions.remove(session);
         pendingMessages.remove(session);
         LOG.info("WebSocket client disconnected: {}", session.getId());
+        
+        // Record telemetry
+        if (telemetryService != null) {
+            telemetryService.recordWsConnection(false);
+        }
     }
     
     @OnError
@@ -81,6 +116,11 @@ public class WebSocketAggregator {
     
     @OnMessage
     public void onMessage(String message, Session session) {
+        // Record telemetry
+        if (telemetryService != null) {
+            telemetryService.recordWsMessageIn();
+        }
+        
         try {
             Map<String, Object> request = mapper.readValue(message, Map.class);
             String action = (String) request.get("action");
@@ -99,6 +139,9 @@ public class WebSocketAggregator {
                     sendDirect(session, new Message("PONG", Map.of(
                         "timestamp", System.currentTimeMillis()
                     )));
+                    break;
+                case "REPLAY_TRADES":
+                    handleTradeReplay(session, request);
                     break;
                 default:
                     LOG.warn("Unknown action: {}", action);
@@ -138,11 +181,16 @@ public class WebSocketAggregator {
                 sub.subscribedOrderBook = true;
                 if (symbols != null) sub.orderBookSymbols.addAll(symbols);
                 break;
+            case "OPTIONS_PRICE":
+                sub.subscribedOptionsPrice = true;
+                if (symbols != null) sub.optionsPriceSymbols.addAll(symbols);
+                break;
             case "ALL":
                 sub.subscribedOrders = true;
                 sub.subscribedTrades = true;
                 sub.subscribedMarketData = true;
                 sub.subscribedPositions = true;
+                sub.subscribedOptionsPrice = true;
                 break;
         }
         
@@ -180,6 +228,10 @@ public class WebSocketAggregator {
                 sub.subscribedOrderBook = false;
                 sub.orderBookSymbols.clear();
                 break;
+            case "OPTIONS_PRICE":
+                sub.subscribedOptionsPrice = false;
+                sub.optionsPriceSymbols.clear();
+                break;
         }
         
         sendDirect(session, new Message("UNSUBSCRIBED", Map.of("channel", channel)));
@@ -215,6 +267,87 @@ public class WebSocketAggregator {
             default:
                 LOG.warn("Unknown snapshot type: {}", snapshotType);
         }
+    }
+    
+    /**
+     * G2-M5: Handle trade replay request on reconnect
+     * - Sends last N trades for specified symbols or all symbols
+     * - Supports custom count from client request
+     */
+    private void handleTradeReplay(Session session, Map<String, Object> request) {
+        Object countObj = request.get("count");
+        int count = countObj != null ? ((Number) countObj).intValue() : TRADE_REPLAY_COUNT;
+        count = Math.min(count, 200); // Cap at 200 to prevent abuse
+        
+        List<String> symbols = (List<String>) request.get("symbols");
+        
+        LOG.info("Trade replay requested by session {} - count: {}, symbols: {}", 
+                session.getId(), count, symbols);
+        
+        List<TradeEntity> tradesToReplay;
+        
+        if (symbols == null || symbols.isEmpty()) {
+            // Replay all recent trades
+            tradesToReplay = tradeService.getRecentTrades(count);
+        } else {
+            // Replay trades for specific symbols
+            tradesToReplay = new ArrayList<>();
+            int perSymbolCount = Math.max(1, count / symbols.size());
+            
+            for (String symbol : symbols) {
+                List<TradeEntity> symbolTrades = tradeService.getTradesBySymbol(symbol);
+                tradesToReplay.addAll(symbolTrades.stream()
+                    .limit(perSymbolCount)
+                    .collect(java.util.stream.Collectors.toList()));
+            }
+            
+            // Sort all by timestamp descending and limit
+            tradesToReplay.sort((a, b) -> {
+                java.time.LocalDateTime aTime = a.getCreatedAt();
+                java.time.LocalDateTime bTime = b.getCreatedAt();
+                if (aTime == null && bTime == null) return 0;
+                if (aTime == null) return 1;
+                if (bTime == null) return -1;
+                return bTime.compareTo(aTime);
+            });
+            if (tradesToReplay.size() > count) {
+                tradesToReplay = tradesToReplay.subList(0, count);
+            }
+        }
+        
+        // Send replay header
+        sendDirect(session, new Message("TRADE_REPLAY_START", Map.of(
+            "count", tradesToReplay.size(),
+            "timestamp", System.currentTimeMillis()
+        )));
+        
+        // Send each trade
+        for (TradeEntity trade : tradesToReplay) {
+            long createdAtMs = trade.getCreatedAt() != null 
+                ? trade.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() 
+                : 0;
+            sendDirect(session, new Message("TRADE_REPLAY", Map.of(
+                "tradeId", trade.getTradeId(),
+                "symbol", trade.getSymbol(),
+                "price", trade.getPrice(),
+                "quantity", trade.getQuantity(),
+                "buyOrderId", trade.getBuyOrderId(),
+                "sellOrderId", trade.getSellOrderId(),
+                "aggressorSide", trade.getAggressorSide(),
+                "tradeDate", trade.getTradeDate(),
+                "tradeTime", createdAtMs,
+                "isReplay", true
+            )));
+        }
+        
+        // Send replay complete
+        sendDirect(session, new Message("TRADE_REPLAY_END", Map.of(
+            "count", tradesToReplay.size(),
+            "timestamp", System.currentTimeMillis()
+        )));
+        
+        LOG.info("Trade replay completed for session {} - sent {} trades", 
+                session.getId(), tradesToReplay.size());
     }
     
     // ================== Public Broadcast Methods ==================
@@ -340,6 +473,60 @@ public class WebSocketAggregator {
         }
     }
     
+    /**
+     * G3-M4: Broadcast options price update to subscribed clients
+     * - Triggered when underlying price changes from trade execution
+     * - Contains fair price, Greeks, and IV
+     */
+    public void broadcastOptionsPrice(String symbol, String optionType,
+                                      double spotPrice, double strikePrice,
+                                      double fairPrice, double delta, double gamma,
+                                      double theta, double vega, double rho,
+                                      double impliedVolatility, double timeToExpiry) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("symbol", symbol);
+        data.put("optionType", optionType);
+        data.put("spotPrice", spotPrice);
+        data.put("strikePrice", strikePrice);
+        data.put("fairPrice", fairPrice);
+        data.put("delta", delta);
+        data.put("gamma", gamma);
+        data.put("theta", theta);
+        data.put("vega", vega);
+        data.put("rho", rho);
+        data.put("impliedVolatility", impliedVolatility);
+        data.put("timeToExpiry", timeToExpiry);
+        data.put("timestamp", System.currentTimeMillis());
+        
+        Message msg = new Message("OPTIONS_PRICE", data);
+        
+        for (Session session : sessions) {
+            ClientSubscription sub = subscriptions.get(session);
+            if (sub != null && sub.subscribedOptionsPrice) {
+                if (sub.optionsPriceSymbols.isEmpty() || sub.optionsPriceSymbols.contains(symbol)) {
+                    queueMessage(session, msg);
+                }
+            }
+        }
+    }
+    
+    /**
+     * G3-M4: Broadcast full option chain update
+     * - Contains all option prices for a symbol after trade execution
+     */
+    public void broadcastOptionPriceUpdate(String symbol, Map<String, Object> data) {
+        Message msg = new Message("OPTION_CHAIN_UPDATE", data);
+        
+        for (Session session : sessions) {
+            ClientSubscription sub = subscriptions.get(session);
+            if (sub != null && sub.subscribedOptionsPrice) {
+                if (sub.optionsPriceSymbols.isEmpty() || sub.optionsPriceSymbols.contains(symbol)) {
+                    queueMessage(session, msg);
+                }
+            }
+        }
+    }
+    
     // ================== Helper Methods ==================
     
     private void queueMessage(Session session, Message message) {
@@ -378,6 +565,9 @@ public class WebSocketAggregator {
         if (session.isOpen()) {
             try {
                 session.getBasicRemote().sendText(mapper.writeValueAsString(message));
+                if (telemetryService != null) {
+                    telemetryService.recordWsMessageOut();
+                }
             } catch (IOException e) {
                 LOG.error("Error sending to session {}: {}", session.getId(), e.getMessage());
             }
@@ -396,11 +586,13 @@ public class WebSocketAggregator {
         boolean subscribedMarketData = false;
         boolean subscribedPositions = false;
         boolean subscribedOrderBook = false;
+        boolean subscribedOptionsPrice = false;
         
         Set<String> orderSymbols = ConcurrentHashMap.newKeySet();
         Set<String> tradeSymbols = ConcurrentHashMap.newKeySet();
         Set<String> marketDataSymbols = ConcurrentHashMap.newKeySet();
         Set<String> orderBookSymbols = ConcurrentHashMap.newKeySet();
+        Set<String> optionsPriceSymbols = ConcurrentHashMap.newKeySet();
     }
     
     public static class Message {

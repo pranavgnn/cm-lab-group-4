@@ -1,9 +1,11 @@
 package com.helesto.service;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +27,9 @@ public class MatchingEngine {
     @Inject
     ReferenceDataService referenceDataService;
     
+    @Inject
+    TelemetryService telemetryService;
+    
     private final AtomicLong execIdSequence = new AtomicLong(1);
     private final AtomicLong tradeIdSequence = new AtomicLong(1);
     
@@ -33,6 +38,7 @@ public class MatchingEngine {
      * Returns a list of execution results
      */
     public MatchResult matchOrder(OrderBookManager.BookOrder incomingOrder) {
+        long startTime = System.nanoTime();
         LOG.info("Processing order: {} {} {} @ {} qty {}", 
                 incomingOrder.orderId, incomingOrder.side, incomingOrder.symbol, 
                 incomingOrder.price, incomingOrder.leavesQty);
@@ -43,6 +49,7 @@ public class MatchingEngine {
         result.symbol = incomingOrder.symbol;
         result.side = incomingOrder.side;
         result.originalQty = incomingOrder.originalQty;
+        result.leavesQty = incomingOrder.leavesQty; // Initialize with order's leaves qty
         
         // Market order handling
         if ("1".equals(incomingOrder.orderType) || "MARKET".equals(incomingOrder.orderType)) {
@@ -61,6 +68,14 @@ public class MatchingEngine {
         
         LOG.info("Match result for {}: status={}, filledQty={}, fills={}", 
                 incomingOrder.orderId, result.status, result.filledQty, result.fills.size());
+        
+        // Record telemetry
+        long matchTimeNanos = System.nanoTime() - startTime;
+        boolean success = !result.fills.isEmpty();
+        telemetryService.recordMatchAttempt(success, matchTimeNanos);
+        for (int i = 0; i < result.fills.size(); i++) {
+            telemetryService.recordTradeGenerated();
+        }
         
         return result;
     }

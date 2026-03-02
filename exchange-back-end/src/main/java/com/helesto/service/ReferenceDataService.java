@@ -383,6 +383,19 @@ public class ReferenceDataService {
         md.lastUpdate = System.currentTimeMillis();
     }
     
+    /**
+     * Update just the last price from a trade execution
+     */
+    public void updateLastPrice(String symbol, double price) {
+        MarketData md = marketDataCache.computeIfAbsent(symbol, k -> {
+            MarketData newMd = new MarketData();
+            newMd.symbol = symbol;
+            return newMd;
+        });
+        md.lastPrice = price;
+        md.lastUpdate = System.currentTimeMillis();
+    }
+    
     public Collection<MarketData> getAllMarketData() {
         return Collections.unmodifiableCollection(marketDataCache.values());
     }
