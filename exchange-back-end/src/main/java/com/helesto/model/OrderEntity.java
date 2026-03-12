@@ -1,11 +1,12 @@
 package com.helesto.model;
 
+import java.time.LocalDateTime;
+
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "orders")
@@ -28,6 +29,10 @@ public class OrderEntity {
     private Long filledQty;
     private Long leavesQty;
     private Double avgPrice;
+    
+    // FIX session tracking for contra fill routing
+    private String senderCompId;
+    private String targetCompId;
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -142,6 +147,22 @@ public class OrderEntity {
     
     public void setAvgPrice(Double avgPrice) {
         this.avgPrice = avgPrice;
+    }
+    
+    public String getSenderCompId() {
+        return senderCompId;
+    }
+    
+    public void setSenderCompId(String senderCompId) {
+        this.senderCompId = senderCompId;
+    }
+    
+    public String getTargetCompId() {
+        return targetCompId;
+    }
+    
+    public void setTargetCompId(String targetCompId) {
+        this.targetCompId = targetCompId;
     }
     
     public LocalDateTime getCreatedAt() {

@@ -202,14 +202,29 @@ public class ExecutionReportService {
             contraOrder.setUpdatedAt(java.time.LocalDateTime.now());
             orderDao.updateOrder(contraOrder);
             
-            // Send fill execution report for contra order
-            sendFill(contraOrder, fill, sessionID);
+            LOG.info("Contra order {} updated - filled {} @ {}, status={}", 
+                    contraOrder.getClOrdId(), fill.quantity, fill.price, contraOrder.getStatus());
             
-            LOG.info("Contra fill processed for order {} - filled {} @ {}", 
-                    contraOrder.getClOrdId(), fill.quantity, fill.price);
+            // Send fill execution report for contra order if it's a FIX order
+            if (contraOrder.getSenderCompId() != null && contraOrder.getTargetCompId() != null) {
+                // Construct the correct session ID for the contra order
+                // Note: For contra order, we need to swap sender/target (we are sending TO the original sender)
+                SessionID contraSessionID = new SessionID(
+                        "FIX.4.4",
+                        contraOrder.getTargetCompId(),  // Our side (exchange)
+                        contraOrder.getSenderCompId()   // Their side (broker)
+                );
+                try {
+                    sendFill(contraOrder, fill, contraSessionID);
+                } catch (SessionNotFound e) {
+                    LOG.warn("Session not found for contra order {}, skipping FIX message", contraOrder.getClOrdId());
+                }
+            } else {
+                LOG.debug("Contra order {} has no FIX session info, skipping FIX message", contraOrder.getClOrdId());
+            }
                     
         } catch (Exception e) {
-            LOG.error("Error processing contra fill for {}: {}", fill.contraOrderId, e.getMessage());
+            LOG.error("Error processing contra fill for {}: {}", fill.contraOrderId, e.getMessage(), e);
         }
     }
 

@@ -272,6 +272,10 @@ public class ExchangeApplication extends MessageCracker implements Application {
             order.setTimeInForce(timeInForce);
             order.setCreatedAt(LocalDateTime.now());
             
+            // Store FIX session info for contra fill routing
+            order.setSenderCompId(sessionID.getSenderCompID());
+            order.setTargetCompId(sessionID.getTargetCompID());
+            
             // Validate order
             OrderValidationService.ValidationResult validationResult = orderValidationService.validateOrder(order);
             if (!validationResult.isValid()) {

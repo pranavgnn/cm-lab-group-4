@@ -160,6 +160,51 @@ public class ReferenceDataService {
         addSecurity("MSFT240315C00400000", "MSFT Call 400 Mar 2024", "OPTION", "TECHNOLOGY", 0.01, 1, 1000000, true);
         addSecurity("NVDA240315C00750000", "NVDA Call 750 Mar 2024", "OPTION", "TECHNOLOGY", 0.01, 1, 1000000, true);
         
+        // Precious Metals
+        addSecurity("XAUUSD", "Gold Spot", "COMMODITY", "PRECIOUS_METALS", 0.01, 1, 100000, true);
+        addSecurity("XAGUSD", "Silver Spot", "COMMODITY", "PRECIOUS_METALS", 0.001, 1, 500000, true);
+        addSecurity("XPTUSD", "Platinum Spot", "COMMODITY", "PRECIOUS_METALS", 0.01, 1, 50000, true);
+        addSecurity("XPDUSD", "Palladium Spot", "COMMODITY", "PRECIOUS_METALS", 0.01, 1, 50000, true);
+        addSecurity("GC", "Gold Futures", "FUTURES", "PRECIOUS_METALS", 0.10, 1, 10000, true);
+        addSecurity("SI", "Silver Futures", "FUTURES", "PRECIOUS_METALS", 0.005, 1, 50000, true);
+        addSecurity("PL", "Platinum Futures", "FUTURES", "PRECIOUS_METALS", 0.10, 1, 5000, true);
+        addSecurity("GLD", "SPDR Gold Trust ETF", "ETF", "PRECIOUS_METALS", 0.01, 1, 100000, true);
+        addSecurity("SLV", "iShares Silver Trust", "ETF", "PRECIOUS_METALS", 0.01, 1, 200000, true);
+        addSecurity("PPLT", "abrdn Platinum ETF", "ETF", "PRECIOUS_METALS", 0.01, 1, 50000, true);
+        
+        // Energy Commodities
+        addSecurity("CL", "Crude Oil WTI", "FUTURES", "ENERGY_COMMODITY", 0.01, 1, 50000, true);
+        addSecurity("BZ", "Brent Crude Oil", "FUTURES", "ENERGY_COMMODITY", 0.01, 1, 50000, true);
+        addSecurity("NG", "Natural Gas", "FUTURES", "ENERGY_COMMODITY", 0.001, 1, 100000, true);
+        addSecurity("HO", "Heating Oil", "FUTURES", "ENERGY_COMMODITY", 0.0001, 1, 50000, true);
+        addSecurity("RB", "RBOB Gasoline", "FUTURES", "ENERGY_COMMODITY", 0.0001, 1, 50000, true);
+        addSecurity("USO", "US Oil Fund ETF", "ETF", "ENERGY_COMMODITY", 0.01, 1, 100000, true);
+        addSecurity("UNG", "US Natural Gas Fund", "ETF", "ENERGY_COMMODITY", 0.01, 1, 100000, true);
+        
+        // Agricultural Commodities
+        addSecurity("ZC", "Corn Futures", "FUTURES", "AGRICULTURE", 0.25, 1, 100000, true);
+        addSecurity("ZW", "Wheat Futures", "FUTURES", "AGRICULTURE", 0.25, 1, 100000, true);
+        addSecurity("ZS", "Soybean Futures", "FUTURES", "AGRICULTURE", 0.25, 1, 50000, true);
+        addSecurity("KC", "Coffee Futures", "FUTURES", "AGRICULTURE", 0.05, 1, 50000, true);
+        addSecurity("SB", "Sugar Futures", "FUTURES", "AGRICULTURE", 0.01, 1, 100000, true);
+        addSecurity("CC", "Cocoa Futures", "FUTURES", "AGRICULTURE", 1.00, 1, 25000, true);
+        addSecurity("CT", "Cotton Futures", "FUTURES", "AGRICULTURE", 0.01, 1, 50000, true);
+        addSecurity("DBA", "Invesco DB Agriculture", "ETF", "AGRICULTURE", 0.01, 1, 100000, true);
+        addSecurity("WEAT", "Teucrium Wheat ETF", "ETF", "AGRICULTURE", 0.01, 1, 100000, true);
+        addSecurity("CORN", "Teucrium Corn ETF", "ETF", "AGRICULTURE", 0.01, 1, 100000, true);
+        
+        // Industrial Metals
+        addSecurity("HG", "Copper Futures", "FUTURES", "INDUSTRIAL_METALS", 0.0005, 1, 100000, true);
+        addSecurity("ALI", "Aluminum Futures", "FUTURES", "INDUSTRIAL_METALS", 0.0005, 1, 100000, true);
+        addSecurity("CPER", "US Copper Index ETF", "ETF", "INDUSTRIAL_METALS", 0.01, 1, 100000, true);
+        addSecurity("JJC", "iPath Copper ETN", "ETF", "INDUSTRIAL_METALS", 0.01, 1, 100000, true);
+        
+        // Livestock
+        addSecurity("LE", "Live Cattle Futures", "FUTURES", "LIVESTOCK", 0.025, 1, 25000, true);
+        addSecurity("HE", "Lean Hogs Futures", "FUTURES", "LIVESTOCK", 0.025, 1, 25000, true);
+        addSecurity("GF", "Feeder Cattle Futures", "FUTURES", "LIVESTOCK", 0.025, 1, 25000, true);
+        addSecurity("COW", "iPath Livestock ETN", "ETF", "LIVESTOCK", 0.01, 1, 50000, true);
+        
         LOG.info("Loaded {} securities into Security Master", securityCache.size());
     }
     
@@ -313,6 +358,51 @@ public class ReferenceDataService {
         setMarketData("SO", 72.60, 72.57, 72.63);
         setMarketData("D", 52.80, 52.77, 52.83);
         setMarketData("AEP", 88.35, 88.32, 88.38);
+        
+        // Precious Metals
+        setMarketData("XAUUSD", 2045.80, 2045.50, 2046.10);   // Gold Spot
+        setMarketData("XAGUSD", 23.45, 23.42, 23.48);         // Silver Spot
+        setMarketData("XPTUSD", 985.60, 985.20, 986.00);      // Platinum Spot
+        setMarketData("XPDUSD", 1025.40, 1024.80, 1026.00);   // Palladium Spot
+        setMarketData("GC", 2048.50, 2048.20, 2048.80);       // Gold Futures
+        setMarketData("SI", 23.52, 23.49, 23.55);             // Silver Futures
+        setMarketData("PL", 988.40, 988.00, 988.80);          // Platinum Futures
+        setMarketData("GLD", 188.45, 188.40, 188.50);         // Gold ETF
+        setMarketData("SLV", 21.58, 21.55, 21.61);            // Silver ETF
+        setMarketData("PPLT", 86.90, 86.85, 86.95);           // Platinum ETF
+        
+        // Energy Commodities
+        setMarketData("CL", 78.45, 78.42, 78.48);             // Crude Oil WTI
+        setMarketData("BZ", 82.30, 82.27, 82.33);             // Brent Crude
+        setMarketData("NG", 2.285, 2.282, 2.288);             // Natural Gas
+        setMarketData("HO", 2.6540, 2.6520, 2.6560);          // Heating Oil
+        setMarketData("RB", 2.2180, 2.2160, 2.2200);          // RBOB Gasoline
+        setMarketData("USO", 75.80, 75.77, 75.83);            // Oil ETF
+        setMarketData("UNG", 12.45, 12.42, 12.48);            // Natural Gas ETF
+        
+        // Agricultural Commodities
+        setMarketData("ZC", 458.25, 458.00, 458.50);          // Corn
+        setMarketData("ZW", 612.50, 612.25, 612.75);          // Wheat
+        setMarketData("ZS", 1185.75, 1185.50, 1186.00);       // Soybeans
+        setMarketData("KC", 185.40, 185.30, 185.50);          // Coffee
+        setMarketData("SB", 21.85, 21.82, 21.88);             // Sugar
+        setMarketData("CC", 5245.00, 5240.00, 5250.00);       // Cocoa
+        setMarketData("CT", 82.45, 82.40, 82.50);             // Cotton
+        setMarketData("DBA", 22.85, 22.82, 22.88);            // Agriculture ETF
+        setMarketData("WEAT", 5.68, 5.66, 5.70);              // Wheat ETF
+        setMarketData("CORN", 22.15, 22.12, 22.18);           // Corn ETF
+        
+        // Industrial Metals
+        setMarketData("HG", 3.8540, 3.8520, 3.8560);          // Copper
+        setMarketData("ALI", 2.4250, 2.4230, 2.4270);         // Aluminum
+        setMarketData("CPER", 22.45, 22.42, 22.48);           // Copper ETF
+        setMarketData("JJC", 18.90, 18.87, 18.93);            // Copper ETN
+        
+        // Livestock
+        setMarketData("LE", 182.450, 182.425, 182.475);       // Live Cattle
+        setMarketData("HE", 85.625, 85.600, 85.650);          // Lean Hogs
+        setMarketData("GF", 252.875, 252.850, 252.900);       // Feeder Cattle
+        setMarketData("COW", 28.45, 28.42, 28.48);            // Livestock ETN
         
         LOG.info("Initialized market data for {} symbols", marketDataCache.size());
     }

@@ -105,6 +105,10 @@ public class TelemetryService {
         orderProcessingCount.incrementAndGet();
     }
     
+    public void recordOrderProcessed() {
+        ordersProcessed.increment();
+    }
+    
     public void recordOrderFilled() {
         ordersFilled.increment();
     }

@@ -1,20 +1,31 @@
 package com.helesto.service;
 
-import javax.annotation.PostConstruct;
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import javax.annotation.PostConstruct;
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.helesto.model.OrderEntity;
 
 /**
  * G2-M1: Order-Book Manager
  * - Manages bid/ask order books per symbol
  * - Price-time priority FIFO matching
  * - Thread-safe operations with fine-grained locking
+ * - Recovers active orders from database on startup
  */
 @ApplicationScoped
 public class OrderBookManager {
@@ -30,9 +41,55 @@ public class OrderBookManager {
     @Inject
     ReferenceDataService referenceDataService;
     
+    @Inject
+    EntityManager entityManager;
+    
     @PostConstruct
     public void init() {
+        LOG.info("OrderBook Manager initializing...");
+        recoverActiveOrders();
         LOG.info("OrderBook Manager initialized");
+    }
+    
+    /**
+     * Recover active orders from database and add to order book
+     * Called on startup to restore order book state
+     */
+    private void recoverActiveOrders() {
+        try {
+            // Load all NEW and PARTIALLY_FILLED orders
+            List<OrderEntity> activeOrders = entityManager.createQuery(
+                    "SELECT o FROM OrderEntity o WHERE o.status IN ('NEW', 'PARTIALLY_FILLED') " +
+                    "AND o.leavesQty > 0 ORDER BY o.createdAt ASC", OrderEntity.class)
+                    .getResultList();
+            
+            int recovered = 0;
+            for (OrderEntity order : activeOrders) {
+                // Only add LIMIT orders to book (market orders execute immediately)
+                if ("LIMIT".equals(order.getOrderType())) {
+                    BookOrder bookOrder = new BookOrder();
+                    bookOrder.orderId = order.getOrderRefNumber();
+                    bookOrder.clOrdId = order.getClOrdId();
+                    bookOrder.symbol = order.getSymbol();
+                    bookOrder.side = order.getSide();
+                    bookOrder.price = order.getPrice();
+                    bookOrder.originalQty = order.getQuantity().intValue();
+                    bookOrder.leavesQty = order.getLeavesQty().intValue();
+                    bookOrder.orderType = order.getOrderType();
+                    bookOrder.timeInForce = order.getTimeInForce();
+                    bookOrder.clientId = order.getClientId();
+                    bookOrder.timestamp = order.getCreatedAt() != null ? 
+                            order.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() :
+                            System.currentTimeMillis();
+                    
+                    addOrder(bookOrder);
+                    recovered++;
+                }
+            }
+            LOG.info("Recovered {} active orders to order book from database", recovered);
+        } catch (Exception e) {
+            LOG.error("Failed to recover orders from database: {}", e.getMessage());
+        }
     }
     
     /**

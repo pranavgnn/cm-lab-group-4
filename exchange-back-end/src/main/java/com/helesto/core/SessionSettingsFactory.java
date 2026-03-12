@@ -59,9 +59,15 @@ public class SessionSettingsFactory {
                 "BeginString=FIX.4.4\n" +
                 "SenderCompID=EXCHANGE\n" +
                 "TargetCompID=BROKER\n" +
+                "SocketAcceptPort=" + quickfixPort + "\n" +
+                "\n" +
+                "[SESSION]\n" +
+                "BeginString=FIX.4.4\n" +
+                "SenderCompID=EXCHANGE\n" +
+                "TargetCompID=MINIFIX\n" +
                 "SocketAcceptPort=" + quickfixPort + "\n";
         
-        LOG.info("Exchange Acceptor configured on port {}", quickfixPort);
+        LOG.info("Exchange Acceptor configured on port {} (accepts BROKER and MINIFIX)", quickfixPort);
         ByteArrayInputStream inputStream = new ByteArrayInputStream(settings.getBytes(StandardCharsets.UTF_8));
         return new SessionSettings(inputStream);
     }

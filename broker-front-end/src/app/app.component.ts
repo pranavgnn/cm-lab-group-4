@@ -845,4 +845,49 @@ export class AppComponent implements OnInit, OnDestroy {
       change: s.changePercent
     }));
   }
+
+  // Helper methods for template
+  getMarketPrice(symbol: string): number {
+    const stock = this.marketData.find(s => s.symbol === symbol);
+    return stock?.lastPrice || 100;
+  }
+
+  getMarketChangePercent(symbol: string): number {
+    const stock = this.marketData.find(s => s.symbol === symbol);
+    return stock?.changePercent || 0;
+  }
+
+  getStockPrice(symbol: string): number {
+    const stock = this.marketData.find(s => s.symbol === symbol);
+    return stock?.lastPrice || 0;
+  }
+
+  getStockChange(symbol: string): number {
+    const stock = this.marketData.find(s => s.symbol === symbol);
+    return stock?.changePercent || 0;
+  }
+
+  onOrderSubmit(formData: any): void {
+    const order: any = {
+      clOrdId: 'ORD-' + Date.now(),
+      symbol: formData.symbol,
+      side: formData.side === 'BUY' ? '1' : '2',
+      quantity: formData.quantity,
+      price: formData.price,
+      orderType: formData.orderType,
+      status: 'NEW'
+    };
+    
+    this.orderService.createOrder(order).pipe(
+      catchError(err => {
+        this.notificationService.error('Order Failed', err.message || 'Failed to submit order');
+        return of(null);
+      })
+    ).subscribe(result => {
+      if (result) {
+        this.notificationService.success('Order Placed', `${formData.side} ${formData.quantity} ${formData.symbol} @ $${formData.price.toFixed(2)}`);
+        this.loadOrders();
+      }
+    });
+  }
 }

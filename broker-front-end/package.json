@@ -1,6 +1,6 @@
 {
   "name": "broker-front-end",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "scripts": {
     "ng": "ng",
     "start": "ng serve --proxy-config proxy.conf.json",
@@ -16,9 +16,12 @@
     "@angular/core": "~13.0.0",
     "@angular/forms": "~13.0.0",
     "@angular/material": "~13.0.0",
+    "@angular/cdk": "~13.0.0",
     "@angular/platform-browser": "~13.0.0",
     "@angular/platform-browser-dynamic": "~13.0.0",
     "@angular/router": "~13.0.0",
+    "lightweight-charts": "^4.1.0",
+    "lucide-angular": "^0.263.0",
     "rxjs": "~7.4.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.11.3"

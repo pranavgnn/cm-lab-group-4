@@ -18,6 +18,7 @@ import com.helesto.model.OrderEntity;
 import com.helesto.service.MatchingEngine;
 import com.helesto.service.OrderBookManager;
 import com.helesto.service.OrderCancelService;
+import com.helesto.service.OrderFlowOrchestrator;
 import com.helesto.service.OrderValidationService;
 import com.helesto.service.TradeService;
 
@@ -46,6 +47,9 @@ public class OrderManagementRest {
     
     @Inject
     TradeService tradeService;
+    
+    @Inject
+    OrderFlowOrchestrator orchestrator;
     
     // ================== Order Query Endpoints ==================
     
@@ -233,6 +237,78 @@ public class OrderManagementRest {
                         "fills", matchResult.fills.size(),
                         "addedToBook", matchResult.addedToBook
                 )).build();
+    }
+    
+    // ================== Orchestrated Order Submission (with full checks) ==================
+    
+    /**
+     * Submit an order through the full orchestrator pipeline including:
+     * - Market state checks
+     * - Rate limiting
+     * - Validation
+     * - Circuit breaker checks  
+     * - Risk management
+     * - Audit trail
+     * - Performance tracking
+     */
+    @POST
+    @Path("/orchestrated")
+    public Response submitOrchestratedOrder(OrderSubmitRequest request) {
+        if (request.symbol == null || request.side == null || request.quantity <= 0) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "Invalid order: symbol, side, quantity required"))
+                    .build();
+        }
+        
+        OrderFlowOrchestrator.OrderRequest orchRequest = OrderFlowOrchestrator.OrderRequest
+                .create(request.symbol, request.side, request.quantity, request.price)
+                .withClientId(request.clientId != null ? request.clientId : "CLIENT001")
+                .withOrderType(request.orderType != null ? request.orderType : "LIMIT")
+                .withTimeInForce(request.timeInForce != null ? request.timeInForce : "DAY");
+        
+        if (request.clOrdId != null) {
+            orchRequest.withClOrdId(request.clOrdId);
+        }
+        
+        OrderFlowOrchestrator.OrderResult result = orchestrator.processOrder(orchRequest);
+        
+        if (result.success) {
+            return Response.status(Response.Status.CREATED)
+                    .entity(result.toMap())
+                    .build();
+        } else {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(result.toMap())
+                    .build();
+        }
+    }
+    
+    /**
+     * Cancel an order through the orchestrated pipeline
+     */
+    @POST
+    @Path("/orchestrated/{orderRefNumber}/cancel")
+    public Response cancelOrchestratedOrder(
+            @PathParam("orderRefNumber") String orderRefNumber,
+            CancelOrderRequest request) {
+        
+        String clientId = request != null ? request.clientId : null;
+        String reason = request != null ? request.reason : "User requested cancel";
+        
+        OrderFlowOrchestrator.CancelResult result = orchestrator.cancelOrder(orderRefNumber, clientId, reason);
+        
+        if (result.success) {
+            return Response.ok(Map.of(
+                    "success", true,
+                    "message", result.message,
+                    "canceledQuantity", result.canceledQuantity,
+                    "filledQuantity", result.filledQuantity
+            )).build();
+        } else {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("success", false, "error", result.message))
+                    .build();
+        }
     }
     
     // ================== Helper Methods ==================
