@@ -71,6 +71,47 @@ public class SystemMetricsRest {
     @Inject
     TelemetryService telemetryService;
     
+    // ==================== Dashboard ====================
+
+    @GET
+    @Path("/dashboard")
+    @Operation(summary = "Aggregated dashboard metrics", description = "Returns health, risk, performance and position data in a single call")
+    public Response getDashboard() {
+        Map<String, Object> dashboard = new HashMap<>();
+
+        // Health
+        Map<String, Object> health = new HashMap<>();
+        health.put("status", "UP");
+        health.put("tradingAllowed", marketStateManager.isTradingAllowed());
+        health.put("marketState", marketStateManager.getCurrentState().toString());
+        health.put("tradingHalted", riskManagementService.isTradingHalted());
+        health.put("timestamp", System.currentTimeMillis());
+        dashboard.put("health", health);
+
+        // Risk summary
+        try { dashboard.put("risk", riskManagementService.getRiskMetrics()); }
+        catch (Exception e) { dashboard.put("risk", Map.of("error", e.getMessage())); }
+
+        // Performance metrics
+        try { dashboard.put("performance", performanceMetricsService.getSummary()); }
+        catch (Exception e) { dashboard.put("performance", Map.of("error", e.getMessage())); }
+
+        // Circuit breaker status
+        try { dashboard.put("circuitBreaker", circuitBreakerService.getStatus()); }
+        catch (Exception e) { dashboard.put("circuitBreaker", Map.of("error", e.getMessage())); }
+
+        // Position summary
+        try { dashboard.put("positions", positionTrackingService.getFirmPortfolioSummary()); }
+        catch (Exception e) { dashboard.put("positions", Map.of("error", e.getMessage())); }
+
+        // Telemetry
+        try { dashboard.put("telemetry", telemetryService.getAllMetrics()); }
+        catch (Exception e) { dashboard.put("telemetry", Map.of("error", e.getMessage())); }
+
+        dashboard.put("generatedAt", System.currentTimeMillis());
+        return Response.ok(dashboard).build();
+    }
+
     // ==================== Health & Status ====================
     
     @GET
@@ -155,7 +196,35 @@ public class SystemMetricsRest {
         riskManagementService.resumeTrading();
         return Response.ok(Map.of("success", true, "message", "Trading resumed")).build();
     }
-    
+
+    // ==================== Market State Control (testing / admin) ====================
+
+    @POST
+    @Path("/market/open")
+    @Operation(summary = "Force market open", description = "Force market state to OPEN / CONTINUOUS for testing")
+    public Response forceMarketOpen(@QueryParam("reason") String reason) {
+        String r = (reason != null && !reason.isEmpty()) ? reason : "Manual open via API";
+        LOG.warn("Force market OPEN requested: {}", r);
+        marketStateManager.forceState(
+                MarketStateManager.MarketState.OPEN,
+                MarketStateManager.TradingPhase.CONTINUOUS,
+                r);
+        return Response.ok(Map.of("success", true, "marketState", "OPEN", "tradingPhase", "CONTINUOUS")).build();
+    }
+
+    @POST
+    @Path("/market/close")
+    @Operation(summary = "Force market close", description = "Force market state to CLOSED for testing")
+    public Response forceMarketClose(@QueryParam("reason") String reason) {
+        String r = (reason != null && !reason.isEmpty()) ? reason : "Manual close via API";
+        LOG.warn("Force market CLOSE requested: {}", r);
+        marketStateManager.forceState(
+                MarketStateManager.MarketState.CLOSED,
+                MarketStateManager.TradingPhase.CLOSED,
+                r);
+        return Response.ok(Map.of("success", true, "marketState", "CLOSED", "tradingPhase", "CLOSED")).build();
+    }
+
     @POST
     @Path("/risk/client/{clientId}/disable")
     @Operation(summary = "Disable client trading", description = "Disable trading for a specific client")
@@ -210,6 +279,14 @@ public class SystemMetricsRest {
         circuitBreakerService.resumeTrading(symbol);
         return Response.ok(Map.of("success", true, "symbol", symbol, "halted", false)).build();
     }
+    
+        @POST
+        @Path("/circuit-breakers/market/resume")
+        @Operation(summary = "Resume market-wide trading", description = "Reset market-wide circuit breaker state")
+        public Response resumeMarketWideTrading() {
+            circuitBreakerService.resumeMarketWideTrading();
+            return Response.ok(Map.of("success", true, "marketHalted", false)).build();
+        }
     
     // ==================== Positions ====================
     

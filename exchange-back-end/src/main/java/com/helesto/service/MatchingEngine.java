@@ -59,7 +59,14 @@ public class MatchingEngine {
         else if ("2".equals(incomingOrder.orderType) || "LIMIT".equals(incomingOrder.orderType)) {
             processLimitOrder(incomingOrder, result);
         }
-        // Stop order - not implemented yet
+        // Stop order - converts to market order when stop price is hit
+        else if ("3".equals(incomingOrder.orderType) || "STOP".equals(incomingOrder.orderType)) {
+            processStopOrder(incomingOrder, result);
+        }
+        // Stop-Limit order - converts to limit order when stop price is hit
+        else if ("4".equals(incomingOrder.orderType) || "STOP_LIMIT".equals(incomingOrder.orderType)) {
+            processStopLimitOrder(incomingOrder, result);
+        }
         else {
             LOG.warn("Unsupported order type: {}", incomingOrder.orderType);
             result.status = OrderStatus.REJECTED;
@@ -142,7 +149,7 @@ public class MatchingEngine {
             
             // IOC (Immediate or Cancel) - cancel unfilled portion
             if ("3".equals(tif) || "IOC".equals(tif)) {
-                result.status = result.filledQty > 0 ? OrderStatus.PARTIAL_FILL : OrderStatus.CANCELED;
+                result.status = result.filledQty > 0 ? OrderStatus.PARTIALLY_FILLED : OrderStatus.CANCELED;
                 result.canceledQty = result.leavesQty;
                 result.leavesQty = 0;
             }
@@ -163,7 +170,7 @@ public class MatchingEngine {
                 // Update order with remaining quantity and add to book
                 order.leavesQty = result.leavesQty;
                 orderBookManager.addOrder(order);
-                result.status = result.filledQty > 0 ? OrderStatus.PARTIAL_FILL : OrderStatus.NEW;
+                result.status = result.filledQty > 0 ? OrderStatus.PARTIALLY_FILLED : OrderStatus.NEW;
                 result.addedToBook = true;
             }
         }
@@ -219,10 +226,84 @@ public class MatchingEngine {
         if (result.leavesQty == 0) {
             result.status = OrderStatus.FILLED;
         } else if (result.filledQty > 0) {
-            result.status = OrderStatus.PARTIAL_FILL;
+            result.status = OrderStatus.PARTIALLY_FILLED;
         }
     }
     
+    /**
+     * Process stop order - triggers as market order when stop price is reached
+     * BUY STOP: triggers when price rises to or above stop price
+     * SELL STOP: triggers when price falls to or below stop price
+     */
+    private void processStopOrder(OrderBookManager.BookOrder order, MatchResult result) {
+        double stopPrice = order.stopPrice > 0 ? order.stopPrice : order.price;
+        double currentMarketPrice = getCurrentMarketPrice(order.symbol, order.side);
+
+        boolean triggered = false;
+        if ("BUY".equals(order.side) || "1".equals(order.side)) {
+            triggered = currentMarketPrice >= stopPrice;
+        } else {
+            triggered = currentMarketPrice <= stopPrice;
+        }
+
+        if (triggered) {
+            LOG.info("Stop order triggered for {} at market price {} (stop: {})", 
+                    order.symbol, currentMarketPrice, stopPrice);
+            // Execute as market order
+            processMarketOrder(order, result);
+        } else {
+            // Add to book as a stop order (pending trigger)
+            order.leavesQty = result.leavesQty;
+            orderBookManager.addOrder(order);
+            result.status = OrderStatus.NEW;
+            result.addedToBook = true;
+            LOG.info("Stop order queued for {} - awaiting price trigger (stop: {}, current: {})",
+                    order.symbol, stopPrice, currentMarketPrice);
+        }
+    }
+
+    /**
+     * Process stop-limit order - triggers as limit order when stop price is reached
+     */
+    private void processStopLimitOrder(OrderBookManager.BookOrder order, MatchResult result) {
+        double stopPrice = order.stopPrice > 0 ? order.stopPrice : order.price;
+        double currentMarketPrice = getCurrentMarketPrice(order.symbol, order.side);
+
+        boolean triggered = false;
+        if ("BUY".equals(order.side) || "1".equals(order.side)) {
+            triggered = currentMarketPrice >= stopPrice;
+        } else {
+            triggered = currentMarketPrice <= stopPrice;
+        }
+
+        if (triggered) {
+            LOG.info("Stop-Limit order triggered for {} at market price {} (stop: {}, limit: {})",
+                    order.symbol, currentMarketPrice, stopPrice, order.price);
+            // Execute as limit order
+            processLimitOrder(order, result);
+        } else {
+            // Add to book pending trigger
+            order.leavesQty = result.leavesQty;
+            orderBookManager.addOrder(order);
+            result.status = OrderStatus.NEW;
+            result.addedToBook = true;
+            LOG.info("Stop-Limit order queued for {} - awaiting price trigger", order.symbol);
+        }
+    }
+
+    /**
+     * Get current best market price for a symbol
+     */
+    private double getCurrentMarketPrice(String symbol, String side) {
+        if ("BUY".equals(side) || "1".equals(side)) {
+            Double bestAsk = orderBookManager.getBestAsk(symbol);
+            return bestAsk != null ? bestAsk : 0.0;
+        } else {
+            Double bestBid = orderBookManager.getBestBid(symbol);
+            return bestBid != null ? bestBid : Double.MAX_VALUE;
+        }
+    }
+
     private String generateExecId() {
         return "EXEC-" + System.currentTimeMillis() + "-" + execIdSequence.getAndIncrement();
     }
@@ -235,7 +316,7 @@ public class MatchingEngine {
     
     public enum OrderStatus {
         NEW,
-        PARTIAL_FILL,
+        PARTIALLY_FILLED,
         FILLED,
         CANCELED,
         REJECTED,

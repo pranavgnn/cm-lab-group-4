@@ -12,7 +12,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
     <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-    <quarkus.platform.version>2.13.5.Final</quarkus.platform.version>
+    <quarkus.platform.version>2.16.12.Final</quarkus.platform.version>
   </properties>
   <dependencyManagement>
     <dependencies>
@@ -99,6 +99,15 @@
         <version>${compiler-plugin.version}</version>
         <configuration>
           <parameters>true</parameters>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.2.5</version>
+        <configuration>
+          <systemPropertyVariables>
+            <net.bytebuddy.experimental>true</net.bytebuddy.experimental>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
     </plugins>

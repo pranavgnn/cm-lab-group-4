@@ -128,6 +128,14 @@ public class OrderBookManager {
     }
     
     /**
+     * Cancel (remove) an order from the book — the side parameter is accepted for API compatibility
+     * but is not needed since the book locates the order by ID alone.
+     */
+    public void cancelOrder(String symbol, String side, String orderId) {
+        removeOrder(symbol, orderId);
+    }
+
+    /**
      * Update order quantity (after partial fill)
      */
     public void updateOrderQuantity(String symbol, String orderId, int newLeavesQty) {
@@ -430,6 +438,7 @@ public class OrderBookManager {
         public String symbol;
         public String side; // BUY/SELL or 1/2
         public double price;
+        public double stopPrice; // For STOP and STOP_LIMIT orders
         public int originalQty;
         public int leavesQty;
         public String orderType;

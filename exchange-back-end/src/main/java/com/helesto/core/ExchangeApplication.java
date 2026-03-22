@@ -4,8 +4,13 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
@@ -17,7 +22,7 @@ import com.helesto.model.OrderEntity;
 import com.helesto.service.ExecutionReportService;
 import com.helesto.service.MatchingEngine;
 import com.helesto.service.OrderBookManager;
-import com.helesto.service.OrderValidationService;
+import com.helesto.service.QuickFixJOrderIntakeEngine;
 import com.helesto.service.TelemetryService;
 import com.helesto.service.TradeService;
 
@@ -46,7 +51,6 @@ import quickfix.field.MsgSeqNum;
 import quickfix.field.MsgType;
 import quickfix.field.OrdRejReason;
 import quickfix.field.OrdStatus;
-import quickfix.field.OrdType;
 import quickfix.field.OrderID;
 import quickfix.field.OrderQty;
 import quickfix.field.OrigClOrdID;
@@ -56,7 +60,6 @@ import quickfix.field.RefSeqNum;
 import quickfix.field.Side;
 import quickfix.field.Symbol;
 import quickfix.field.Text;
-import quickfix.field.TimeInForce;
 import quickfix.fix44.BusinessMessageReject;
 import quickfix.fix44.ExecutionReport;
 import quickfix.fix44.NewOrderSingle;
@@ -74,10 +77,10 @@ public class ExchangeApplication extends MessageCracker implements Application {
     ExecutionReportService executionReportService;
 
     @Inject
-    OrderValidationService orderValidationService;
+    OrderDao orderDao;
 
     @Inject
-    OrderDao orderDao;
+    QuickFixJOrderIntakeEngine quickFixJOrderIntakeEngine;
 
     @Inject
     MatchingEngine matchingEngine;
@@ -90,6 +93,19 @@ public class ExchangeApplication extends MessageCracker implements Application {
 
     @Inject
     TelemetryService telemetryService;
+
+    private final ExecutorService asyncExecutor = new ThreadPoolExecutor(
+            2,
+            4,
+            60,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(10000),
+            runnable -> {
+                Thread thread = new Thread(runnable, "fix-async-worker");
+                thread.setDaemon(true);
+                return thread;
+            }
+    );
 
     // Session event tracking
     private final List<SessionEvent> sessionEvents = new CopyOnWriteArrayList<>();
@@ -120,6 +136,11 @@ public class ExchangeApplication extends MessageCracker implements Application {
         LOG.info("FIX Logout - SessionID: {}", sessionID);
         sessionLoggedOn = false;
         addSessionEvent("LOGOUT", "Broker disconnected: " + sessionID.getTargetCompID());
+    }
+
+    @PreDestroy
+    public void shutdownAsyncExecutor() {
+        asyncExecutor.shutdown();
     }
 
     @Override
@@ -225,102 +246,65 @@ public class ExchangeApplication extends MessageCracker implements Application {
      */
     public void onMessage(NewOrderSingle newOrderSingle, SessionID sessionID)
             throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType {
+        LOG.info("Dispatching NewOrderSingle to async gateway worker");
+        asyncExecutor.submit(() -> processNewOrderSingleAsync(newOrderSingle, sessionID));
+    }
+
+    private void processNewOrderSingleAsync(NewOrderSingle newOrderSingle, SessionID sessionID) {
         long orderStartTime = System.nanoTime();
-        LOG.info("Processing NewOrderSingle");
-        
-        // Record order received
+
         if (telemetryService != null) {
             telemetryService.recordOrderReceived();
         }
-        
+
         try {
-            // Extract order details
-            String clOrdId = newOrderSingle.getClOrdID().getValue();
-            String symbol = newOrderSingle.getSymbol().getValue();
-            char side = newOrderSingle.getSide().getValue();
-            double qty = newOrderSingle.getOrderQty().getValue();
-            char ordType = newOrderSingle.getOrdType().getValue();
-            
-            double price = 0;
-            if (ordType == OrdType.LIMIT || ordType == OrdType.STOP_LIMIT) {
-                try {
-                    price = newOrderSingle.getPrice().getValue();
-                } catch (FieldNotFound e) {
-                    // Price required for limit orders - send reject
-                    sendRejectExecutionReport(clOrdId, symbol, side, qty, OrdRejReason.OTHER, 
-                            "Price required for LIMIT orders", sessionID);
-                    return;
-                }
-            }
-            
-            String timeInForce = "DAY";
-            try {
-                char tif = newOrderSingle.getTimeInForce().getValue();
-                timeInForce = mapTimeInForce(tif);
-            } catch (FieldNotFound e) {
-                // Default to DAY
-            }
-            
-            // Create order entity
-            OrderEntity order = new OrderEntity();
-            order.setClOrdId(clOrdId);
-            order.setSymbol(symbol);
-            order.setSide(String.valueOf(side));
-            order.setQuantity((long) qty);
-            order.setPrice(price);
-            order.setOrderType(mapOrdType(ordType));
-            order.setTimeInForce(timeInForce);
-            order.setCreatedAt(LocalDateTime.now());
-            
-            // Store FIX session info for contra fill routing
-            order.setSenderCompId(sessionID.getSenderCompID());
-            order.setTargetCompId(sessionID.getTargetCompID());
-            
-            // Validate order
-            OrderValidationService.ValidationResult validationResult = orderValidationService.validateOrder(order);
-            if (!validationResult.isValid()) {
-                LOG.warn("Order validation failed: {}", validationResult.getErrors());
-                if (telemetryService != null) {
-                    telemetryService.recordOrderRejected();
-                }
-                sendRejectExecutionReport(clOrdId, symbol, side, qty, OrdRejReason.OTHER, 
-                        String.join("; ", validationResult.getErrors()), sessionID);
-                return;
-            }
-            
-            // Enrich order
-            orderValidationService.enrichOrder(order);
-            order.setStatus("NEW");
-            orderDao.persistOrder(order);
-            
-            LOG.info("Order validated and persisted: {} -> {}", clOrdId, order.getOrderRefNumber());
-            addSessionEvent("ORDER_RECEIVED", "Order " + clOrdId + " received and validated");
-            
-            // Record order processed
-            if (telemetryService != null) {
-                long processingTime = System.nanoTime() - orderStartTime;
-                telemetryService.recordOrderProcessed(processingTime);
-            }
-            
-            // Send NEW acknowledgment
-            executionReportService.sendAck(order, sessionID);
-            
-            // Process through matching engine
-            processOrderMatch(order, sessionID);
-            
+            QuickFixJOrderIntakeEngine.IntakeResult intakeResult = quickFixJOrderIntakeEngine.intake(newOrderSingle, sessionID);
+            routeIntakeResult(intakeResult, sessionID, orderStartTime);
         } catch (Exception e) {
-            LOG.error("Error processing NewOrderSingle", e);
+            LOG.error("Error processing NewOrderSingle asynchronously", e);
             if (telemetryService != null) {
                 telemetryService.recordError();
             }
             try {
                 String clOrdId = newOrderSingle.getClOrdID().getValue();
-                sendRejectExecutionReport(clOrdId, "UNKNOWN", Side.BUY, 0, OrdRejReason.OTHER, 
+                sendRejectExecutionReport(clOrdId, "UNKNOWN", Side.BUY, 0, OrdRejReason.OTHER,
                         "Internal error: " + e.getMessage(), sessionID);
             } catch (FieldNotFound ex) {
                 LOG.error("Cannot extract ClOrdID for reject", ex);
             }
         }
+    }
+
+    private void routeIntakeResult(QuickFixJOrderIntakeEngine.IntakeResult intakeResult,
+                                   SessionID sessionID,
+                                   long orderStartTime) throws SessionNotFound {
+        if (!intakeResult.accepted) {
+            LOG.warn("QuickFIX/J order intake rejected {}: {}", intakeResult.clOrdId, intakeResult.rejectReason);
+            if (telemetryService != null) {
+                telemetryService.recordOrderRejected();
+            }
+            sendRejectExecutionReport(
+                    intakeResult.clOrdId,
+                    intakeResult.symbol,
+                    intakeResult.side,
+                    intakeResult.quantity,
+                    OrdRejReason.OTHER,
+                    intakeResult.rejectReason,
+                    sessionID);
+            return;
+        }
+
+        OrderEntity order = intakeResult.order;
+        LOG.info("Order validated and persisted: {} -> {}", intakeResult.clOrdId, order.getOrderRefNumber());
+        addSessionEvent("ORDER_RECEIVED", "Order " + intakeResult.clOrdId + " received and validated");
+
+        if (telemetryService != null) {
+            long processingTime = System.nanoTime() - orderStartTime;
+            telemetryService.recordOrderProcessed(processingTime);
+        }
+
+        executionReportService.sendAck(order, sessionID);
+        processOrderMatch(order, sessionID);
     }
 
     /**
@@ -641,27 +625,6 @@ public class ExchangeApplication extends MessageCracker implements Application {
             
         } catch (Exception e) {
             LOG.error("Cannot send business reject", e);
-        }
-    }
-
-    private String mapOrdType(char ordType) {
-        switch (ordType) {
-            case OrdType.MARKET: return "MARKET";
-            case OrdType.LIMIT: return "LIMIT";
-            case '3': return "STOP"; // FIX Stop order type
-            case OrdType.STOP_LIMIT: return "STOP_LIMIT";
-            default: return "LIMIT";
-        }
-    }
-
-    private String mapTimeInForce(char tif) {
-        switch (tif) {
-            case TimeInForce.DAY: return "DAY";
-            case TimeInForce.GOOD_TILL_CANCEL: return "GTC";
-            case TimeInForce.IMMEDIATE_OR_CANCEL: return "IOC";
-            case TimeInForce.FILL_OR_KILL: return "FOK";
-            case TimeInForce.GOOD_TILL_DATE: return "GTD";
-            default: return "DAY";
         }
     }
 

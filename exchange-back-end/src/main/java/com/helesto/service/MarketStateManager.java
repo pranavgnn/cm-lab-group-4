@@ -1,9 +1,22 @@
 package com.helesto.service;
 
-import java.time.*;
+import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import javax.annotation.PostConstruct;
@@ -46,6 +59,9 @@ public class MarketStateManager {
     
     // Session configuration
     private MarketSchedule schedule = new MarketSchedule();
+
+    // Manual override window (used for admin/testing force-open/close)
+    private volatile LocalDateTime manualOverrideUntil;
     
     // Holiday calendar
     private final Set<LocalDate> holidays = ConcurrentHashMap.newKeySet();
@@ -138,6 +154,17 @@ public class MarketStateManager {
     private void checkAndUpdateState() {
         try {
             LocalDateTime now = LocalDateTime.now(MARKET_TIMEZONE);
+
+            // Keep forced state while manual override window is active
+            if (manualOverrideUntil != null && now.isBefore(manualOverrideUntil)) {
+                return;
+            }
+
+            // Clear expired override
+            if (manualOverrideUntil != null && !now.isBefore(manualOverrideUntil)) {
+                manualOverrideUntil = null;
+            }
+
             LocalDate today = now.toLocalDate();
             LocalTime currentTime = now.toLocalTime();
             
@@ -271,6 +298,8 @@ public class MarketStateManager {
      */
     public void forceState(MarketState state, TradingPhase phase, String reason) {
         LOG.warn("Force state change to {} / {} - Reason: {}", state, phase, reason);
+        // Hold forced state for 30 minutes to support testing/admin workflows
+        manualOverrideUntil = LocalDateTime.now(MARKET_TIMEZONE).plusMinutes(30);
         transitionState(state, phase, "FORCED: " + reason);
     }
     

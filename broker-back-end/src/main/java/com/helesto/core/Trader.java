@@ -1,10 +1,16 @@
 package com.helesto.core;
 
+import java.io.File;
+import java.util.Iterator;
+
+import javax.inject.Inject;
 import javax.inject.Singleton;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import quickfix.CompositeLogFactory;
 import quickfix.ConfigError;
 import quickfix.DefaultMessageFactory;
 import quickfix.FileLogFactory;
@@ -18,12 +24,6 @@ import quickfix.Session;
 import quickfix.SessionID;
 import quickfix.SessionSettings;
 import quickfix.SocketInitiator;
-import quickfix.CompositeLogFactory;
-import javax.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
-import java.io.File;
-import java.util.Iterator;
 
 @Singleton
 public class Trader {
@@ -62,8 +62,8 @@ public class Trader {
             LOG.info("SessionSettings created");
 
             // Create directories for FileStore and FileLog
-            new File("./target/data/broker").mkdirs();
-            new File("./target/logs/broker").mkdirs();
+            new File("./runtime/data/broker").mkdirs();
+            new File("./runtime/logs/broker").mkdirs();
 
             // Use file-based store and log for development
             MessageStoreFactory messageStoreFactory = new FileStoreFactory(sessionSettings);

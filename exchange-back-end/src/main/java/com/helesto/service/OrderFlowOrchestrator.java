@@ -1,12 +1,13 @@
 package com.helesto.service;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +72,9 @@ public class OrderFlowOrchestrator {
     
     @Inject
     TelemetryService telemetryService;
+
+    @Inject
+    OrderCacheService orderCacheService;
     
     /**
      * Process an order through the complete pipeline
@@ -165,6 +169,7 @@ public class OrderFlowOrchestrator {
             order.setLeavesQty(order.getQuantity());
             order.setAvgPrice(0.0);
             orderDao.persistOrder(order);
+            orderCacheService.addToCache(order);
             performanceMetricsService.recordLatency("db.write", System.nanoTime() - stepStart);
             
             auditTrailService.logOrderAccepted(clOrdId, order.getOrderRefNumber());
@@ -182,6 +187,7 @@ public class OrderFlowOrchestrator {
             order.setLeavesQty((long) matchResult.leavesQty);
             order.setAvgPrice(matchResult.avgPrice);
             orderDao.updateOrder(order);
+            orderCacheService.addToCache(order);
             performanceMetricsService.recordLatency("db.write", System.nanoTime() - stepStart);
             
             // 11. Process Fills
@@ -207,14 +213,17 @@ public class OrderFlowOrchestrator {
             // Log final status
             if (matchResult.status == MatchingEngine.OrderStatus.FILLED) {
                 auditTrailService.logOrderFilled(clOrdId, order.getOrderRefNumber());
-            } else if (matchResult.status == MatchingEngine.OrderStatus.PARTIAL_FILL) {
+            } else if (matchResult.status == MatchingEngine.OrderStatus.PARTIALLY_FILLED) {
                 auditTrailService.logOrderPartialFill(clOrdId, order.getOrderRefNumber(),
                         matchResult.filledQty, matchResult.leavesQty);
             }
             
             // Record total latency
-            performanceMetricsService.recordLatency("order.total", System.nanoTime() - startTime);
+            long totalLatency = System.nanoTime() - startTime;
+            performanceMetricsService.recordLatency("order.total", totalLatency);
             telemetryService.recordOrderProcessed();
+            telemetryService.recordOrderProcessed(totalLatency);
+            telemetryService.recordMatchAttempt(matchResult.filledQty > 0, 0L);
             
             LOG.info("Order processed: clOrdId={}, orderRef={}, status={}, filled={}/{}", 
                     clOrdId, order.getOrderRefNumber(), matchResult.status, 
@@ -259,6 +268,7 @@ public class OrderFlowOrchestrator {
             order.setStatus("CANCELED");
             order.setLeavesQty(0L);
             orderDao.updateOrder(order);
+            orderCacheService.addToCache(order);
             
             // Audit trail
             auditTrailService.logOrderCanceled(order.getClOrdId(), orderRefNumber, reason);
@@ -277,13 +287,21 @@ public class OrderFlowOrchestrator {
     
     private boolean isOrderTypeAllowedInPhase(String orderType) {
         MarketStateManager.TradingPhase phase = marketStateManager.getCurrentPhase();
+        String normalizedType = normalizeOrderType(orderType);
+
         if (phase == MarketStateManager.TradingPhase.CONTINUOUS) {
             return true; // All order types allowed
         }
         if (phase == MarketStateManager.TradingPhase.OPENING_AUCTION ||
             phase == MarketStateManager.TradingPhase.CLOSING_AUCTION) {
             // Only limit orders in auctions
-            return "LIMIT".equalsIgnoreCase(orderType);
+            return "LIMIT".equalsIgnoreCase(normalizedType);
+        }
+        if (phase == MarketStateManager.TradingPhase.PRE_OPEN ||
+            phase == MarketStateManager.TradingPhase.POST_CLOSE) {
+            // Extended sessions: allow non-market passive orders
+            return "LIMIT".equalsIgnoreCase(normalizedType) ||
+                   "STOP_LIMIT".equalsIgnoreCase(normalizedType);
         }
         return false;
     }

@@ -1,11 +1,26 @@
 package com.helesto.service;
 
-import java.io.*;
-import java.nio.file.*;
-import java.time.*;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.PostConstruct;
@@ -539,7 +554,7 @@ public class AuditTrailService {
         event.execId = trade.getExecId();
         event.symbol = trade.getSymbol();
         event.price = trade.getPrice();
-        event.quantity = trade.getQuantity();
+        event.quantity = trade.getQuantity() != null ? trade.getQuantity().longValue() : 0L;
         event.buyClientId = trade.getBuyClientId();
         event.sellClientId = trade.getSellClientId();
         event.buyOrderId = trade.getBuyOrderId();

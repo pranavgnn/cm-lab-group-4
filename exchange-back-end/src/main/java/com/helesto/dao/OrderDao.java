@@ -22,13 +22,13 @@ public class OrderDao {
 
     @Transactional
     public void persistOrder(OrderEntity order) {
-        LOG.info("Persisting order: {}", order.getClOrdId());
+        LOG.debug("Persisting order: {}", order.getClOrdId());
         em.persist(order);
     }
 
     @Transactional
     public void updateOrder(OrderEntity order) {
-        LOG.info("Updating order: {}", order.getClOrdId());
+        LOG.debug("Updating order: {}", order.getClOrdId());
         em.merge(order);
     }
 
@@ -53,27 +53,27 @@ public class OrderDao {
     }
 
     public List<OrderEntity> findAll() {
-        LOG.info("Finding all orders");
+        LOG.debug("Finding all orders");
         return em.createQuery("SELECT o FROM OrderEntity o ORDER BY o.createdAt DESC", OrderEntity.class)
                 .getResultList();
     }
 
     public List<OrderEntity> findBySymbol(String symbol) {
-        LOG.info("Finding orders by symbol: {}", symbol);
+        LOG.debug("Finding orders by symbol: {}", symbol);
         return em.createQuery("SELECT o FROM OrderEntity o WHERE o.symbol = :symbol ORDER BY o.createdAt DESC", OrderEntity.class)
                 .setParameter("symbol", symbol)
                 .getResultList();
     }
 
     public List<OrderEntity> findByStatus(String status) {
-        LOG.info("Finding orders by status: {}", status);
+        LOG.debug("Finding orders by status: {}", status);
         return em.createQuery("SELECT o FROM OrderEntity o WHERE o.status = :status ORDER BY o.createdAt DESC", OrderEntity.class)
                 .setParameter("status", status)
                 .getResultList();
     }
 
     public List<OrderEntity> findByClientId(String clientId) {
-        LOG.info("Finding orders by clientId: {}", clientId);
+        LOG.debug("Finding orders by clientId: {}", clientId);
         return em.createQuery("SELECT o FROM OrderEntity o WHERE o.clientId = :clientId ORDER BY o.createdAt DESC", OrderEntity.class)
                 .setParameter("clientId", clientId)
                 .getResultList();

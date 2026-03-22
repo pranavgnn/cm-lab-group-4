@@ -58,7 +58,7 @@ public class OrderCacheService {
     
     // Active orders only (excludes terminal states)
     private static final Set<String> ACTIVE_STATUSES = Set.of(
-        "NEW", "PENDING_NEW", "PARTIALLY_FILLED", "PENDING_CANCEL", "PENDING_REPLACE"
+        "NEW", "PENDING_NEW", "PARTIALLY_FILLED", "PARTIAL_FILL", "PENDING_CANCEL", "PENDING_REPLACE"
     );
     
     @PostConstruct

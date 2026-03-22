@@ -44,6 +44,12 @@ public class OrderCancelService {
     
     @Inject
     WebSocketAggregator webSocketAggregator;
+
+    @Inject
+    OrderCacheService orderCacheService;
+
+    @Inject
+    TelemetryService telemetryService;
     
     // Audit trail storage (in production, persist to database)
     private final List<AuditEntry> auditTrail = new CopyOnWriteArrayList<>();
@@ -111,6 +117,7 @@ public class OrderCancelService {
         String previousStatus = order.getStatus();
         order.setStatus("PENDING_CANCEL");
         orderDao.update(order);
+        orderCacheService.addToCache(order);
         
         pendingCancels.put(orderRefNumber, cancelRequest);
         
@@ -151,6 +158,8 @@ public class OrderCancelService {
         order.setStatus("CANCELED");
         order.setLeavesQty(0L);
         orderDao.update(order);
+        orderCacheService.addToCache(order);
+        telemetryService.recordOrderCancelled();
         
         // Remove from pending
         pendingCancels.remove(orderRefNumber);
@@ -192,6 +201,7 @@ public class OrderCancelService {
             String newStatus = filledQty > 0 ? "PARTIALLY_FILLED" : "NEW";
             order.setStatus(newStatus);
             orderDao.update(order);
+            orderCacheService.addToCache(order);
             
             audit.details = String.format("Reverted status to %s. Reason: %s", newStatus, rejectReason);
         }

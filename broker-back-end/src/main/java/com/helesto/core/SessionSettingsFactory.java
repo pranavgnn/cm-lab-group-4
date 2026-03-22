@@ -42,8 +42,8 @@ public class SessionSettingsFactory {
                 "ReconnectInterval=5\n" +
                 "SocketConnectHost=" + quickfixHost + "\n" +
                 "SocketConnectPort=" + quickfixPort + "\n" +
-                "FileStorePath=./target/data/broker\n" +
-                "FileLogPath=./target/logs/broker\n" +
+                "FileStorePath=./runtime/data/broker\n" +
+                "FileLogPath=./runtime/logs/broker\n" +
                 "UseDataDictionary=Y\n" +
                 "DataDictionary=FIX44.xml\n" +
                 "ValidateUserDefinedFields=N\n" +

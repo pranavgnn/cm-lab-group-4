@@ -38,8 +38,8 @@ public class SessionSettingsFactory {
                 "HeartBtInt=" + heartbeatInterval + "\n" +
                 "ReconnectInterval=5\n" +
                 "SocketAcceptPort=" + quickfixPort + "\n" +
-                "FileStorePath=./target/data/exchange\n" +
-                "FileLogPath=./target/logs/exchange\n" +
+                "FileStorePath=./runtime/data/exchange\n" +
+                "FileLogPath=./runtime/logs/exchange\n" +
                 "UseDataDictionary=Y\n" +
                 "DataDictionary=FIX44.xml\n" +
                 "ValidateUserDefinedFields=N\n" +
