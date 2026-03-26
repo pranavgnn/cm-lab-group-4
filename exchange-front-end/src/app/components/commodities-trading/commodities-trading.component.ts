@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, Output, EventEmitter } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 
 interface CommodityQuote {
   symbol: string;
@@ -58,7 +59,13 @@ export class CommoditiesTradingComponent implements OnInit, OnDestroy {
     mostActive: null as CommodityQuote | null
   };
 
+  tradeSubmitting = false;
+  tradeSuccess: string | null = null;
+  tradeError: string | null = null;
+
   private updateInterval: any;
+
+  constructor(private readonly http: HttpClient) {}
 
   ngOnInit(): void {
     this.initializeCategories();
@@ -266,18 +273,46 @@ export class CommoditiesTradingComponent implements OnInit, OnDestroy {
   }
 
   submitTrade(): void {
-    if (!this.selectedCommodity) return;
-    
-    console.log('Submitting commodity trade:', {
+    if (!this.selectedCommodity) {
+      return;
+    }
+
+    if (this.tradeSubmitting) {
+      return;
+    }
+
+    this.tradeSuccess = null;
+    this.tradeError = null;
+
+    const executionPrice = this.tradeForm.orderType === 'MARKET'
+      ? (this.tradeForm.side === 'BUY' ? this.selectedCommodity.ask : this.selectedCommodity.bid)
+      : this.tradeForm.price;
+
+    const payload = {
+      clOrdId: `CMDTY-${Date.now()}`,
       symbol: this.selectedCommodity.symbol,
-      side: this.tradeForm.side,
-      quantity: this.tradeForm.quantity,
-      price: this.tradeForm.price,
-      orderType: this.tradeForm.orderType
+      side: this.tradeForm.side === 'BUY' ? '1' : '2',
+      quantity: Math.max(1, Math.floor(this.tradeForm.quantity)),
+      price: executionPrice,
+      orderType: this.tradeForm.orderType,
+      timeInForce: 'DAY',
+      status: 'NEW'
+    };
+
+    this.tradeSubmitting = true;
+    this.http.post<any>('/api/orders', payload).subscribe({
+      next: (result) => {
+        const ref = result?.orderRefNumber || result?.clOrdId || payload.clOrdId;
+        this.tradeSuccess = `Order submitted: ${ref}`;
+        this.tradeForm.quantity = 1;
+        this.tradeForm.price = this.selectedCommodity?.price || this.tradeForm.price;
+        this.tradeSubmitting = false;
+      },
+      error: (err) => {
+        this.tradeError = err?.error?.message || err?.error?.error || 'Failed to submit commodity order';
+        this.tradeSubmitting = false;
+      }
     });
-    
-    // Reset form
-    this.tradeForm.quantity = 1;
   }
 
   formatPrice(price: number, symbol: string): string {

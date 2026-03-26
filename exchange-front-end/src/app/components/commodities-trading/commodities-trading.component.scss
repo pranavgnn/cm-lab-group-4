@@ -34,6 +34,7 @@ $font-mono: 'JetBrains Mono', 'Fira Code', SFMono-Regular, Consolas, monospace;
   flex-direction: column;
   overflow: hidden;
   height: 100%;
+  min-width: 0;
 }
 
 // Header
@@ -320,6 +321,7 @@ $font-mono: 'JetBrains Mono', 'Fira Code', SFMono-Regular, Consolas, monospace;
   padding: 20px;
   background: $bg-tertiary;
   flex-shrink: 0;
+  min-width: 0;
 
   .detail-header {
     display: flex;
@@ -398,6 +400,37 @@ $font-mono: 'JetBrains Mono', 'Fira Code', SFMono-Regular, Consolas, monospace;
           color: $danger;
         }
       }
+    }
+  }
+}
+
+@media (max-width: 1024px) {
+  .panel-header {
+    padding: 14px 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+
+    .header-stats {
+      gap: 8px;
+      width: 100%;
+      justify-content: flex-end;
+    }
+  }
+
+  .commodities-list {
+    .list-header,
+    .commodity-row {
+      grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.9fr);
+      gap: 8px;
+      padding-inline: 12px;
+    }
+  }
+
+  .commodity-detail {
+    padding: 14px;
+
+    .detail-stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 }
@@ -534,6 +567,31 @@ $font-mono: 'JetBrains Mono', 'Fira Code', SFMono-Regular, Consolas, monospace;
       &:hover {
         background: lighten($danger, 5%);
       }
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  .trade-feedback {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    border: 1px solid transparent;
+
+    &.success {
+      color: $success;
+      border-color: rgba($success, 0.45);
+      background: rgba($success, 0.12);
+    }
+
+    &.error {
+      color: $danger;
+      border-color: rgba($danger, 0.45);
+      background: rgba($danger, 0.12);
     }
   }
 }

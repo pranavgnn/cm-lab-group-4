@@ -384,6 +384,31 @@
               </button>
             </div>
           </div>
+
+          <div class="orders-controls">
+            <div class="orders-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input
+                type="text"
+                [(ngModel)]="orderSearchQuery"
+                placeholder="Search by symbol, order ID, side or status"
+              >
+            </div>
+
+            <div class="orders-filter-group">
+              <select [(ngModel)]="orderStatusFilter">
+                <option *ngFor="let status of orderStatusOptions" [value]="status">{{ status }}</option>
+              </select>
+              <button class="btn-clear-filters" (click)="clearOrderFilters()">Reset</button>
+            </div>
+
+            <div class="orders-count">
+              Showing {{ filteredOrders.length }} / {{ orders.length }}
+            </div>
+          </div>
           
           <div class="alert error" *ngIf="error">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -408,7 +433,7 @@
           </div>
           
           <div class="orders-table-wrapper" *ngIf="!loading">
-            <table class="orders-table" *ngIf="orders.length > 0">
+            <table class="orders-table" *ngIf="filteredOrders.length > 0">
               <thead>
                 <tr>
                   <th>Order ID</th>
@@ -419,11 +444,12 @@
                   <th>Type</th>
                   <th>Status</th>
                   <th>Filled</th>
+                  <th>FIX Response</th>
                   <th>Time</th>
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let order of orders; trackBy: trackByOrderId" class="order-row">
+                <tr *ngFor="let order of filteredOrders; trackBy: trackByOrderId" class="order-row">
                   <td class="cell-id">{{ order.orderRefNumber || order.clOrdId }}</td>
                   <td class="cell-symbol">
                     <span class="symbol-badge">{{ order.symbol }}</span>
@@ -442,18 +468,50 @@
                     </span>
                   </td>
                   <td class="cell-filled">{{ order.filledQty || 0 }}/{{ order.quantity }}</td>
+                  <td class="cell-response">
+                    <div class="response-actions">
+                      <button
+                        class="btn-response"
+                        title="Send ACK"
+                        (click)="sendOrderResponse(order, 'ACK')"
+                        [disabled]="isOrderResponseSending(order, 'ACK')">
+                        ACK
+                      </button>
+                      <button
+                        class="btn-response"
+                        title="Send STATUS"
+                        (click)="sendOrderResponse(order, 'STATUS')"
+                        [disabled]="isOrderResponseSending(order, 'STATUS')">
+                        STS
+                      </button>
+                      <button
+                        class="btn-response"
+                        title="Send CANCEL"
+                        (click)="sendOrderResponse(order, 'CANCEL')"
+                        [disabled]="isOrderResponseSending(order, 'CANCEL')">
+                        CXL
+                      </button>
+                      <button
+                        class="btn-response danger"
+                        title="Send REJECT"
+                        (click)="sendOrderResponse(order, 'REJECT')"
+                        [disabled]="isOrderResponseSending(order, 'REJECT')">
+                        REJ
+                      </button>
+                    </div>
+                  </td>
                   <td class="cell-time">{{ order.createdAt | date:'HH:mm:ss' }}</td>
                 </tr>
               </tbody>
             </table>
             
-            <div class="empty-state" *ngIf="orders.length === 0">
+            <div class="empty-state" *ngIf="filteredOrders.length === 0">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14 2 14 8 20 8"/>
               </svg>
-              <h4>No Orders Yet</h4>
-              <p>Submit an order or wait for FIX messages from Broker</p>
+              <h4>{{ orders.length === 0 ? 'No Orders Yet' : 'No Matching Orders' }}</h4>
+              <p>{{ orders.length === 0 ? 'Submit an order or wait for FIX messages from Broker' : 'Try clearing search or status filters' }}</p>
             </div>
           </div>
         </div>
@@ -473,6 +531,67 @@
         
         <!-- Activity Feed -->
         <app-activity-feed [orders]="orders"></app-activity-feed>
+
+        <!-- Session Events -->
+        <div class="session-events-card">
+          <div class="card-header">
+            <h3>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              FIX Session Events
+            </h3>
+            <div class="card-actions">
+              <button class="btn-icon" (click)="loadSessionEvents(sessionEventsLimit)" title="Refresh Events">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <polyline points="1 20 1 14 7 14"/>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="session-events-toolbar">
+            <div class="session-events-filter-group">
+              <button class="session-filter-btn" [class.active]="sessionEventFilter === 'ALL'" (click)="sessionEventFilter = 'ALL'">All</button>
+              <button class="session-filter-btn" [class.active]="sessionEventFilter === 'ERRORS'" (click)="sessionEventFilter = 'ERRORS'">Errors</button>
+              <button class="session-filter-btn" [class.active]="sessionEventFilter === 'ORDERS'" (click)="sessionEventFilter = 'ORDERS'">Orders</button>
+              <button class="session-filter-btn" [class.active]="sessionEventFilter === 'SESSION'" (click)="sessionEventFilter = 'SESSION'">Session</button>
+            </div>
+
+            <div class="session-events-tools">
+              <select [(ngModel)]="sessionEventsLimit" (ngModelChange)="loadSessionEvents(sessionEventsLimit)">
+                <option *ngFor="let limit of sessionEventLimits" [ngValue]="limit">{{ limit }} events</option>
+              </select>
+
+              <label class="session-live-toggle">
+                <input type="checkbox" [(ngModel)]="sessionEventsLive">
+                <span>Live</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="session-events-list" *ngIf="!sessionEventsLoading && filteredSessionEvents.length > 0">
+            <div class="session-event-row" *ngFor="let event of filteredSessionEvents">
+              <div class="session-event-top">
+                <span [class]="getSessionEventClass(event.type)">{{ event.type }}</span>
+                <span class="session-event-time">{{ event.timestamp | date:'HH:mm:ss' }}</span>
+              </div>
+              <div class="session-event-message">{{ event.message }}</div>
+            </div>
+          </div>
+
+          <div class="session-events-empty" *ngIf="sessionEventsLoading">
+            Loading session events...
+          </div>
+
+          <div class="session-events-empty" *ngIf="!sessionEventsLoading && filteredSessionEvents.length === 0">
+            {{ sessionEvents.length === 0 ? 'No session events yet' : 'No events match the selected filter' }}
+          </div>
+        </div>
       </div>
     </div>
     
@@ -517,8 +636,34 @@
               Refresh
             </button>
           </div>
+
+          <div class="orders-controls">
+            <div class="orders-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input
+                type="text"
+                [(ngModel)]="orderSearchQuery"
+                placeholder="Search by symbol, order ID, side or status"
+              >
+            </div>
+
+            <div class="orders-filter-group">
+              <select [(ngModel)]="orderStatusFilter">
+                <option *ngFor="let status of orderStatusOptions" [value]="status">{{ status }}</option>
+              </select>
+              <button class="btn-clear-filters" (click)="clearOrderFilters()">Reset</button>
+            </div>
+
+            <div class="orders-count">
+              Showing {{ filteredOrders.length }} / {{ orders.length }}
+            </div>
+          </div>
+
           <div class="orders-table-wrapper">
-            <table class="orders-table" *ngIf="orders.length > 0">
+            <table class="orders-table" *ngIf="filteredOrders.length > 0">
               <thead>
                 <tr>
                   <th>Order ID</th>
@@ -529,11 +674,12 @@
                   <th>Type</th>
                   <th>Status</th>
                   <th>Filled</th>
+                  <th>FIX Response</th>
                   <th>Time</th>
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let order of orders">
+                <tr *ngFor="let order of filteredOrders">
                   <td>{{ order.orderRefNumber || order.clOrdId }}</td>
                   <td><span class="symbol-badge">{{ order.symbol }}</span></td>
                   <td><span class="side-badge" [class]="getSideClass(order.side)">{{ getSideLabel(order.side) }}</span></td>
@@ -542,17 +688,49 @@
                   <td>{{ order.orderType || 'LIMIT' }}</td>
                   <td><span class="status-badge" [class]="getStatusClass(order.status)">{{ order.status }}</span></td>
                   <td>{{ order.filledQty || 0 }}/{{ order.quantity }}</td>
+                  <td class="cell-response">
+                    <div class="response-actions">
+                      <button
+                        class="btn-response"
+                        title="Send ACK"
+                        (click)="sendOrderResponse(order, 'ACK')"
+                        [disabled]="isOrderResponseSending(order, 'ACK')">
+                        ACK
+                      </button>
+                      <button
+                        class="btn-response"
+                        title="Send STATUS"
+                        (click)="sendOrderResponse(order, 'STATUS')"
+                        [disabled]="isOrderResponseSending(order, 'STATUS')">
+                        STS
+                      </button>
+                      <button
+                        class="btn-response"
+                        title="Send CANCEL"
+                        (click)="sendOrderResponse(order, 'CANCEL')"
+                        [disabled]="isOrderResponseSending(order, 'CANCEL')">
+                        CXL
+                      </button>
+                      <button
+                        class="btn-response danger"
+                        title="Send REJECT"
+                        (click)="sendOrderResponse(order, 'REJECT')"
+                        [disabled]="isOrderResponseSending(order, 'REJECT')">
+                        REJ
+                      </button>
+                    </div>
+                  </td>
                   <td>{{ order.createdAt | date:'HH:mm:ss' }}</td>
                 </tr>
               </tbody>
             </table>
-            <div class="empty-state" *ngIf="orders.length === 0">
+            <div class="empty-state" *ngIf="filteredOrders.length === 0">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14 2 14 8 20 8"/>
               </svg>
-              <h4>No Orders Yet</h4>
-              <p>Submit an order from the Dashboard</p>
+              <h4>{{ orders.length === 0 ? 'No Orders Yet' : 'No Matching Orders' }}</h4>
+              <p>{{ orders.length === 0 ? 'Submit an order from the Dashboard' : 'Try clearing search or status filters' }}</p>
             </div>
           </div>
         </div>

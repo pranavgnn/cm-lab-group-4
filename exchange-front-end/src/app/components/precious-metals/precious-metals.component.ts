@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, Output, EventEmitter } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 
 interface MetalQuote {
   symbol: string;
@@ -106,7 +107,13 @@ export class PreciousMetalsComponent implements OnInit, OnDestroy {
   compareMode = false;
   compareSymbol: string | null = null;
 
+  submittingOrder = false;
+  submitSuccess: string | null = null;
+  submitError: string | null = null;
+
   private updateInterval: any;
+
+  constructor(private readonly http: HttpClient) {}
 
   ngOnInit(): void {
     this.initializeMetals();
@@ -314,20 +321,46 @@ export class PreciousMetalsComponent implements OnInit, OnDestroy {
   }
 
   submitOrder(): void {
-    if (!this.selectedMetal) return;
-    
-    console.log('Submitting precious metal order:', {
+    if (!this.selectedMetal) {
+      return;
+    }
+
+    if (this.submittingOrder) {
+      return;
+    }
+
+    this.submitSuccess = null;
+    this.submitError = null;
+
+    const executionPrice = this.orderForm.orderType === 'MARKET'
+      ? (this.orderForm.side === 'BUY' ? this.selectedMetal.ask : this.selectedMetal.bid)
+      : this.orderForm.price;
+
+    const payload = {
+      clOrdId: `PM-${Date.now()}`,
       symbol: this.selectedMetal.symbol,
-      side: this.orderForm.side,
-      quantity: this.orderForm.quantity,
-      unit: this.orderForm.unit,
+      side: this.orderForm.side === 'BUY' ? '1' : '2',
+      quantity: Math.max(1, Math.floor(this.orderForm.quantity)),
+      price: executionPrice,
       orderType: this.orderForm.orderType,
-      price: this.orderForm.price,
-      stopPrice: this.orderForm.stopPrice
+      timeInForce: 'DAY',
+      status: 'NEW'
+    };
+
+    this.submittingOrder = true;
+    this.http.post<any>('/api/orders', payload).subscribe({
+      next: (result) => {
+        const ref = result?.orderRefNumber || result?.clOrdId || payload.clOrdId;
+        this.submitSuccess = `Order submitted: ${ref}`;
+        this.orderForm.quantity = 1;
+        this.orderForm.price = this.selectedMetal?.price || this.orderForm.price;
+        this.submittingOrder = false;
+      },
+      error: (err) => {
+        this.submitError = err?.error?.message || err?.error?.error || 'Failed to submit precious metals order';
+        this.submittingOrder = false;
+      }
     });
-    
-    // Reset quantity after order
-    this.orderForm.quantity = 1;
   }
 
   formatPrice(price: number): string {

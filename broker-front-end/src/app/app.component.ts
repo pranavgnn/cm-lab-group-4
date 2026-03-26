@@ -135,6 +135,19 @@ export class AppComponent implements OnInit, OnDestroy {
     targetPrice: 180.00,
     condition: 'above' as 'above' | 'below'
   };
+
+  // Orders controls
+  orderSearchQuery = '';
+  orderStatusFilter = 'ALL';
+
+  readonly orderStatusOptions = [
+    'ALL',
+    'NEW',
+    'PARTIALLY_FILLED',
+    'FILLED',
+    'CANCELED',
+    'REJECTED'
+  ];
   
   private pollingSubscription?: Subscription;
   private marketDataSubscription?: Subscription;
@@ -503,6 +516,37 @@ export class AppComponent implements OnInit, OnDestroy {
   
   getOpenCount(): number {
     return this.orders.filter(o => ['NEW', 'PARTIALLY_FILLED'].includes(o.status?.toUpperCase() || '')).length;
+  }
+
+  get filteredOrders(): Order[] {
+    const query = this.orderSearchQuery.trim().toLowerCase();
+
+    return this.orders.filter(order => {
+      const status = (order.status || '').toUpperCase();
+      const normalizedStatus = status === 'CANCELLED' ? 'CANCELED' : status;
+      const statusMatches = this.orderStatusFilter === 'ALL' || normalizedStatus === this.orderStatusFilter;
+
+      if (!statusMatches) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return [
+        order.clOrdId || '',
+        order.orderRefNumber || '',
+        order.symbol || '',
+        this.getSideLabel(order.side),
+        normalizedStatus
+      ].some(value => value.toLowerCase().includes(query));
+    });
+  }
+
+  clearOrderFilters(): void {
+    this.orderSearchQuery = '';
+    this.orderStatusFilter = 'ALL';
   }
   
   // Toast notification methods

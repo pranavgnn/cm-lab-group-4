@@ -210,9 +210,13 @@
         class="submit-btn" 
         [class.buy]="tradeForm.side === 'BUY'" 
         [class.sell]="tradeForm.side === 'SELL'"
+        [disabled]="tradeSubmitting"
         (click)="submitTrade()">
-        {{ tradeForm.side }} {{ selectedCommodity.symbol }}
+        {{ tradeSubmitting ? 'Submitting...' : (tradeForm.side + ' ' + selectedCommodity.symbol) }}
       </button>
+
+      <div class="trade-feedback success" *ngIf="tradeSuccess">{{ tradeSuccess }}</div>
+      <div class="trade-feedback error" *ngIf="tradeError">{{ tradeError }}</div>
     </div>
   </div>
 </div>

@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { OrderService } from './services/order.service';
-import { Order, SessionStatus } from './models/order.model';
+import { Order, SessionStatus, SessionEvent } from './models/order.model';
 import { Subscription, interval, of, forkJoin } from 'rxjs';
 import { switchMap, catchError } from 'rxjs/operators';
 
@@ -116,7 +116,12 @@ export class AppComponent implements OnInit, OnDestroy {
   title = 'Exchange Platform';
   orders: Order[] = [];
   sessionStatus: SessionStatus | null = null;
+  sessionEvents: SessionEvent[] = [];
   loading = false;
+  sessionEventsLoading = false;
+  sessionEventFilter: 'ALL' | 'ERRORS' | 'ORDERS' | 'SESSION' = 'ALL';
+  sessionEventsLimit = 20;
+  sessionEventsLive = true;
   error: string | null = null;
   success: string | null = null;
   
@@ -132,6 +137,18 @@ export class AppComponent implements OnInit, OnDestroy {
   allStocks: StockQuote[] = [];
   securities: Security[] = [];
   searchQuery = '';
+  orderSearchQuery = '';
+  orderStatusFilter = 'ALL';
+  readonly orderStatusOptions = [
+    'ALL',
+    'NEW',
+    'PARTIALLY_FILLED',
+    'FILLED',
+    'CANCELED',
+    'REJECTED'
+  ];
+  private readonly responseInFlightKeys = new Set<string>();
+  readonly sessionEventLimits = [20, 50, 100];
   
   // Position Tracking
   positions: Position[] = [];
@@ -265,6 +282,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.loadMarketData();
     this.loadOrders();
     this.loadSessionStatus();
+    this.loadSessionEvents(this.sessionEventsLimit);
     this.startPolling();
     this.startMarketDataPolling();
     
@@ -452,6 +470,80 @@ export class AppComponent implements OnInit, OnDestroy {
   getOpenCount(): number {
     return this.orders.filter(o => ['NEW', 'PARTIALLY_FILLED'].includes(o.status?.toUpperCase() || '')).length;
   }
+
+  get filteredOrders(): Order[] {
+    const query = this.orderSearchQuery.trim().toLowerCase();
+
+    return this.orders.filter(order => {
+      const status = (order.status || '').toUpperCase();
+      const normalizedStatus = status === 'CANCELLED' ? 'CANCELED' : status;
+      const statusMatches = this.orderStatusFilter === 'ALL' || normalizedStatus === this.orderStatusFilter;
+
+      if (!statusMatches) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return [
+        order.clOrdId || '',
+        order.orderRefNumber || '',
+        order.symbol || '',
+        this.getSideLabel(order.side),
+        normalizedStatus
+      ].some(value => value.toLowerCase().includes(query));
+    });
+  }
+
+  clearOrderFilters(): void {
+    this.orderSearchQuery = '';
+    this.orderStatusFilter = 'ALL';
+  }
+
+  sendOrderResponse(order: Order, responseType: 'ACK' | 'STATUS' | 'CANCEL' | 'REJECT'): void {
+    const clOrdId = order.clOrdId;
+    if (!clOrdId) {
+      this.error = 'Cannot send FIX response: missing clOrdId on selected order';
+      return;
+    }
+
+    const requestKey = `${clOrdId}:${responseType}`;
+    if (this.responseInFlightKeys.has(requestKey)) {
+      return;
+    }
+
+    this.responseInFlightKeys.add(requestKey);
+    this.error = null;
+
+    this.orderService.sendQuickFixResponse({
+      clOrdId,
+      responseType,
+      text: `Triggered from Exchange UI (${responseType})`
+    }).pipe(
+      catchError(err => {
+        this.error = err?.error?.message || `Failed to send ${responseType} response for ${clOrdId}`;
+        return of(null);
+      })
+    ).subscribe(result => {
+      this.responseInFlightKeys.delete(requestKey);
+
+      if (result?.success) {
+        this.success = `${result.responseType} response sent for ${result.clOrdId}`;
+        this.loadSessionStatus();
+        this.loadSessionEvents(this.sessionEventsLimit);
+      }
+    });
+  }
+
+  isOrderResponseSending(order: Order, responseType: 'ACK' | 'STATUS' | 'CANCEL' | 'REJECT'): boolean {
+    const clOrdId = order.clOrdId;
+    if (!clOrdId) {
+      return false;
+    }
+    return this.responseInFlightKeys.has(`${clOrdId}:${responseType}`);
+  }
   
   toggleCategory(category: StockCategory): void {
     category.expanded = !category.expanded;
@@ -492,6 +584,44 @@ export class AppComponent implements OnInit, OnDestroy {
       this.sessionStatus = status;
     });
   }
+
+  get filteredSessionEvents(): SessionEvent[] {
+    if (this.sessionEventFilter === 'ALL') {
+      return this.sessionEvents;
+    }
+
+    return this.sessionEvents.filter(event => {
+      const type = (event.type || '').toUpperCase();
+
+      if (this.sessionEventFilter === 'ERRORS') {
+        return type.includes('REJECT') || type.includes('ERROR');
+      }
+
+      if (this.sessionEventFilter === 'ORDERS') {
+        return type.includes('ORDER') || type.includes('FILL') || type.includes('TRADE') || type.includes('CANCEL');
+      }
+
+      if (this.sessionEventFilter === 'SESSION') {
+        return type.includes('SESSION') || type.includes('LOGON') || type.includes('LOGOUT') || type.includes('HEARTBEAT');
+      }
+
+      return true;
+    });
+  }
+
+  loadSessionEvents(limit = this.sessionEventsLimit): void {
+    this.sessionEventsLimit = limit;
+    this.sessionEventsLoading = true;
+    this.orderService.getSessionEvents(limit).pipe(
+      catchError(err => {
+        console.error('Failed to load session events', err);
+        return of([]);
+      })
+    ).subscribe(events => {
+      this.sessionEvents = events;
+      this.sessionEventsLoading = false;
+    });
+  }
   
   startPolling(): void {
     this.pollingSubscription = interval(5000).pipe(
@@ -501,6 +631,10 @@ export class AppComponent implements OnInit, OnDestroy {
     ).subscribe(orders => {
       this.orders = orders;
       this.calculatePositions();
+      this.loadSessionStatus();
+      if (this.sessionEventsLive) {
+        this.loadSessionEvents(this.sessionEventsLimit);
+      }
     });
   }
   
@@ -514,6 +648,32 @@ export class AppComponent implements OnInit, OnDestroy {
       default: return 'status-unknown';
     }
   }
+
+  getSessionEventClass(type: string): string {
+    const normalizedType = (type || '').toUpperCase();
+
+    if (normalizedType.includes('REJECT')) {
+      return 'event-chip event-chip--reject';
+    }
+
+    if (normalizedType.includes('CANCEL') || normalizedType.includes('LOGOUT')) {
+      return 'event-chip event-chip--cancel';
+    }
+
+    if (normalizedType.includes('FILL') || normalizedType.includes('TRADE')) {
+      return 'event-chip event-chip--fill';
+    }
+
+    if (normalizedType.includes('ORDER')) {
+      return 'event-chip event-chip--order';
+    }
+
+    if (normalizedType.includes('LOGON') || normalizedType.includes('SESSION')) {
+      return 'event-chip event-chip--session';
+    }
+
+    return 'event-chip event-chip--default';
+  }
   
   getSideLabel(side: string): string {
     return side === '1' ? 'BUY' : side === '2' ? 'SELL' : side;
@@ -526,6 +686,7 @@ export class AppComponent implements OnInit, OnDestroy {
   refreshOrders(): void {
     this.loadOrders();
     this.loadSessionStatus();
+    this.loadSessionEvents(this.sessionEventsLimit);
   }
 
   submitOrder(): void {

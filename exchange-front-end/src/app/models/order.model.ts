@@ -51,3 +51,22 @@ export interface SessionStatus {
   targetCompId: string;
   lastMessageTime: Date;
 }
+
+export interface QuickFixResponseRequest {
+  clOrdId: string;
+  responseType: 'ACK' | 'STATUS' | 'CANCEL' | 'REJECT';
+  text?: string;
+}
+
+export interface QuickFixResponseResult {
+  success: boolean;
+  responseType: string;
+  clOrdId: string;
+  message: string;
+}
+
+export interface SessionEvent {
+  type: string;
+  message: string;
+  timestamp: number;
+}

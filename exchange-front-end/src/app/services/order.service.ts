@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, Subject } from 'rxjs';
-import { Order, Trade, SessionStatus } from '../models/order.model';
+import { Order, Trade, SessionStatus, QuickFixResponseRequest, QuickFixResponseResult, SessionEvent } from '../models/order.model';
 
 @Injectable({
   providedIn: 'root'
@@ -37,6 +37,14 @@ export class OrderService {
 
   getSessionStatus(): Observable<SessionStatus> {
     return this.http.get<SessionStatus>('/api/session');
+  }
+
+  sendQuickFixResponse(request: QuickFixResponseRequest): Observable<QuickFixResponseResult> {
+    return this.http.post<QuickFixResponseResult>('/api/session/respond', request);
+  }
+
+  getSessionEvents(limit = 20): Observable<SessionEvent[]> {
+    return this.http.get<SessionEvent[]>(`/api/session/events?limit=${limit}`);
   }
 
   orderUpdates$(): Observable<Order> {

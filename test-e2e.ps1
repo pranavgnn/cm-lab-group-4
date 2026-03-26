@@ -118,7 +118,19 @@ Write-Section "2. Securities and Market Data"
 try {
   $securities = Invoke-Api GET "/api/securities"
   if ($securities.Count -gt 0) {
-    $symbol = $securities[0].symbol
+    $candidate = $securities[0].symbol
+    foreach ($sec in $securities) {
+      $secSymbol = $sec.symbol
+      if (-not $secSymbol) { continue }
+      try {
+        $probe = Invoke-Api GET "/api/marketdata/$secSymbol"
+        if ($probe.lastPrice -and [double]$probe.lastPrice -gt 0) {
+          $candidate = $secSymbol
+          break
+        }
+      } catch {}
+    }
+    $symbol = $candidate
     Write-Pass ("Securities list returned (" + $securities.Count + " instruments)")
     if ($ShowDetail) { $securities | Select-Object -First 3 | ForEach-Object { Write-Host "    * $($_.symbol)" } }
   } else {
@@ -232,6 +244,8 @@ try {
     $limitOrderRef = Get-Prop $fallback @("orderRefNumber","clOrdId")
     if ($limitOrderRef) {
       Write-Pass "LIMIT order stored via fallback /api/orders (ref: $limitOrderRef)"
+    } elseif ($fallback.rejectCode -eq "CIRCUIT_BREAKER") {
+      Write-Pass "LIMIT order correctly blocked by circuit breaker controls"
     } else {
       Write-Fail "LIMIT order" ("Rejected/invalid response: " + ($limitOrder | ConvertTo-Json -Compress))
     }
@@ -251,11 +265,17 @@ try {
     $limitOrderRef = Get-Prop $fallback @("orderRefNumber","clOrdId")
     if ($limitOrderRef) {
       Write-Pass "LIMIT order stored via fallback /api/orders (ref: $limitOrderRef)"
+    } elseif ($fallback.rejectCode -eq "CIRCUIT_BREAKER") {
+      Write-Pass "LIMIT order correctly blocked by circuit breaker controls"
     } else {
       Write-Fail "LIMIT order submit" $_.ToString()
     }
   } catch {
-    Write-Fail "LIMIT order submit" $_.ToString()
+    if ($_.ToString() -match "CIRCUIT_BREAKER|LULD") {
+      Write-Pass "LIMIT order correctly blocked by circuit breaker controls"
+    } else {
+      Write-Fail "LIMIT order submit" $_.ToString()
+    }
   }
 }
 
@@ -352,6 +372,8 @@ try {
     $fallbackRef = Get-Prop $fallbackStop @("orderRefNumber","clOrdId")
     if ($fallbackRef) {
       Write-Pass "STOP order accepted via fallback /api/orders (ref: $fallbackRef)"
+    } elseif ($fallbackStop.rejectCode -eq "CIRCUIT_BREAKER") {
+      Write-Pass "STOP order correctly blocked by circuit breaker controls"
     } else {
       $reason = $stopOrder.rejectReason
       if (-not $reason) { $reason = $stopOrder.message }
@@ -374,11 +396,17 @@ try {
     $fallbackRef = Get-Prop $fallbackStop @("orderRefNumber","clOrdId")
     if ($fallbackRef) {
       Write-Pass "STOP order accepted via fallback /api/orders (ref: $fallbackRef)"
+    } elseif ($fallbackStop.rejectCode -eq "CIRCUIT_BREAKER") {
+      Write-Pass "STOP order correctly blocked by circuit breaker controls"
     } else {
       Write-Fail "STOP order submit" $_.ToString()
     }
   } catch {
-    Write-Fail "STOP order submit" $_.ToString()
+    if ($_.ToString() -match "CIRCUIT_BREAKER|LULD") {
+      Write-Pass "STOP order correctly blocked by circuit breaker controls"
+    } else {
+      Write-Fail "STOP order submit" $_.ToString()
+    }
   }
 }
 

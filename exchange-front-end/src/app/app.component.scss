@@ -48,6 +48,8 @@ $header-height: 52px;
 .exchange-app {
   display: flex;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   background: $bg-primary;
   color: $text-primary;
   font-family: $font-sans;
@@ -285,6 +287,8 @@ $header-height: 52px;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 // ============================================
@@ -408,7 +412,7 @@ $header-height: 52px;
 // ============================================
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(200px, 1fr));
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
   gap: 16px;
   padding: 16px 24px;
   background: $bg-primary;
@@ -591,6 +595,195 @@ $header-height: 52px;
   gap: 16px;
   min-width: 0;
   overflow: hidden;
+}
+
+.session-events-card {
+  background: $bg-secondary;
+  border: 1px solid $border-default;
+  border-radius: 12px;
+  overflow: hidden;
+
+  .card-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid $border-muted;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: $text-secondary;
+    }
+  }
+}
+
+.session-events-list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.session-events-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid $border-muted;
+  flex-wrap: wrap;
+}
+
+.session-events-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.session-filter-btn {
+  height: 24px;
+  border: 1px solid $border-default;
+  border-radius: 999px;
+  background: $bg-tertiary;
+  color: $text-secondary;
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: $info;
+    color: $info;
+  }
+
+  &.active {
+    color: $info;
+    border-color: rgba($info, 0.55);
+    background: rgba($info, 0.12);
+  }
+}
+
+.session-events-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  select {
+    height: 26px;
+    border: 1px solid $border-default;
+    border-radius: 7px;
+    padding: 0 8px;
+    background: $bg-tertiary;
+    color: $text-primary;
+    font-size: 11px;
+    font-weight: 600;
+  }
+}
+
+.session-live-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: $text-secondary;
+
+  input {
+    accent-color: $info;
+  }
+}
+
+.session-event-row {
+  padding: 10px 12px;
+  border-bottom: 1px solid $border-muted;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.session-event-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.session-event-type {
+  font-size: 11px;
+  font-weight: 700;
+  color: $info;
+}
+
+.event-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+
+.event-chip--session {
+  color: $info;
+  border-color: rgba($info, 0.5);
+  background: rgba($info, 0.12);
+}
+
+.event-chip--order {
+  color: $accent-purple;
+  border-color: rgba($accent-purple, 0.5);
+  background: rgba($accent-purple, 0.12);
+}
+
+.event-chip--fill {
+  color: $success;
+  border-color: rgba($success, 0.5);
+  background: rgba($success, 0.12);
+}
+
+.event-chip--cancel {
+  color: $warning;
+  border-color: rgba($warning, 0.5);
+  background: rgba($warning, 0.12);
+}
+
+.event-chip--reject {
+  color: $danger;
+  border-color: rgba($danger, 0.5);
+  background: rgba($danger, 0.12);
+}
+
+.event-chip--default {
+  color: $text-secondary;
+  border-color: rgba($text-secondary, 0.45);
+  background: rgba($text-secondary, 0.1);
+}
+
+.session-event-time {
+  font-size: 11px;
+  color: $text-muted;
+  font-family: $font-mono;
+}
+
+.session-event-message {
+  font-size: 12px;
+  color: $text-primary;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.session-events-empty {
+  padding: 14px;
+  font-size: 12px;
+  color: $text-muted;
 }
 
 // ============================================
@@ -1050,6 +1243,148 @@ $header-height: 52px;
   }
 }
 
+.orders-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  padding: 12px 20px;
+  border-bottom: 1px solid $border-default;
+  align-items: center;
+
+  @media (max-width: 1260px) {
+    grid-template-columns: 1fr 1fr;
+
+    .orders-count {
+      grid-column: 1 / -1;
+      justify-self: start;
+    }
+  }
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.orders-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid $border-default;
+  border-radius: 8px;
+  background: $bg-tertiary;
+
+  svg {
+    color: $text-muted;
+    flex-shrink: 0;
+  }
+
+  input {
+    width: 100%;
+    height: 34px;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: $text-primary;
+    font-size: 13px;
+
+    &::placeholder {
+      color: $text-muted;
+    }
+  }
+}
+
+.orders-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  select {
+    height: 34px;
+    min-width: 150px;
+    border: 1px solid $border-default;
+    border-radius: 8px;
+    padding: 0 10px;
+    background: $bg-tertiary;
+    color: $text-primary;
+    font-size: 12px;
+    font-weight: 600;
+  }
+}
+
+.btn-clear-filters {
+  height: 34px;
+  border: 1px solid $border-default;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: $bg-tertiary;
+  color: $text-secondary;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: $info;
+    border-color: $info;
+    background: rgba($info, 0.1);
+  }
+}
+
+.orders-count {
+  align-self: center;
+  justify-self: end;
+  font-size: 12px;
+  font-weight: 600;
+  color: $text-muted;
+
+  @media (max-width: 900px) {
+    justify-self: start;
+  }
+}
+
+.cell-response {
+  min-width: 170px;
+}
+
+.response-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(34px, 1fr));
+  gap: 4px;
+  min-width: 160px;
+}
+
+.btn-response {
+  height: 26px;
+  border: 1px solid $border-default;
+  border-radius: 6px;
+  background: $bg-tertiary;
+  color: $text-secondary;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) {
+    border-color: $info;
+    color: $info;
+    background: rgba($info, 0.12);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &.danger:hover:not(:disabled) {
+    border-color: $danger;
+    color: $danger;
+    background: rgba($danger, 0.12);
+  }
+}
+
 // ============================================
 // ALERTS
 // ============================================
@@ -1317,6 +1652,14 @@ $header-height: 52px;
   }
 }
 
+@media (max-width: 1320px) {
+  .top-header {
+    .header-center {
+      display: none;
+    }
+  }
+}
+
 @media (max-width: 1024px) {
   .stats-row {
     grid-template-columns: repeat(2, 1fr);
@@ -1442,9 +1785,13 @@ $header-height: 52px;
 // COMMODITIES & PRECIOUS METALS SECTION
 // ============================================
 .commodities-section {
-  padding: 16px 32px 40px;
+  padding: 16px clamp(14px, 2vw, 32px) 36px;
   margin-top: 16px;
   border-top: 1px solid $border-default;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
   
   .section-header {
     display: flex;
@@ -1482,12 +1829,17 @@ $header-height: 52px;
   
   .commodities-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 32px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(14px, 1.8vw, 28px);
+    width: 100%;
+    max-width: 100%;
+    align-items: start;
     
     > * {
-      min-height: 520px;
-      max-height: 680px;
+      min-height: 0;
+      max-height: none;
+      min-width: 0;
+      width: 100%;
     }
   }
 }
@@ -1505,6 +1857,22 @@ $header-height: 52px;
   .commodities-section {
     .commodities-grid {
       grid-template-columns: 1fr;
+    }
+  }
+}
+
+@media (max-width: 900px) {
+  .commodities-section {
+    padding-inline: 10px;
+
+    .section-header {
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      flex-wrap: wrap;
+
+      h2 {
+        font-size: 18px;
+      }
     }
   }
 }
@@ -1662,6 +2030,8 @@ $header-height: 52px;
   app-precious-metals {
     display: block;
     max-width: 100%;
+    min-width: 0;
+    width: 100%;
   }
 }
 

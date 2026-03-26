@@ -47,9 +47,9 @@ public class SessionSettingsFactory {
                 "ValidateFieldsHaveValues=Y\n" +
                 "AllowUnknownMsgFields=Y\n" +
                 "RefreshOnLogon=Y\n" +
-                "ResetOnLogon=Y\n" +
+                "ResetOnLogon=N\n" +
                 "ResetOnLogout=Y\n" +
-                "ResetOnDisconnect=Y\n" +
+                "ResetOnDisconnect=N\n" +
                 "SendRedundantResendRequests=Y\n" +
                 "PersistMessages=Y\n" +
                 "LogonTimeout=30\n" +

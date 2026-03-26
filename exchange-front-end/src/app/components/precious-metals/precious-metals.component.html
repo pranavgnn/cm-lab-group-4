@@ -290,9 +290,13 @@
         <button class="submit-btn" 
                 [class.buy]="orderForm.side === 'BUY'"
                 [class.sell]="orderForm.side === 'SELL'"
+                [disabled]="submittingOrder"
                 (click)="submitOrder()">
-          {{ orderForm.side }} {{ selectedMetal.symbol }}
+          {{ submittingOrder ? 'Submitting...' : (orderForm.side + ' ' + selectedMetal.symbol) }}
         </button>
+
+        <div class="submit-feedback success" *ngIf="submitSuccess">{{ submitSuccess }}</div>
+        <div class="submit-feedback error" *ngIf="submitError">{{ submitError }}</div>
       </div>
     </div>
   </div>
