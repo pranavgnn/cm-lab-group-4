@@ -5,8 +5,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -46,6 +49,9 @@ public class MarketDataPoller {
     
     @Inject
     TelemetryService telemetryService;
+
+    @Inject
+    BlackScholesPricingService pricingService;
     
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final Map<String, MarketDataSnapshot> lastSnapshots = new ConcurrentHashMap<>();
@@ -59,11 +65,13 @@ public class MarketDataPoller {
     
     // Base prices for simulation
     private final Map<String, Double> basePrices = new ConcurrentHashMap<>();
+    private final Map<String, List<OptionContract>> optionContractsByUnderlying = new ConcurrentHashMap<>();
     
     @PostConstruct
     public void init() {
         LOG.info("Market Data Poller initializing...");
         initializeBasePrices();
+        initializeOptionContracts();
         
         // Start simulation/polling
         if (simulationMode) {
@@ -198,6 +206,107 @@ public class MarketDataPoller {
         
         LOG.info("Initialized {} base prices for simulation", basePrices.size());
     }
+
+    private void initializeOptionContracts() {
+        optionContractsByUnderlying.clear();
+
+        Collection<ReferenceDataService.Security> optionSecurities = referenceDataService.getSecuritiesByType("OPTION");
+        for (ReferenceDataService.Security security : optionSecurities) {
+            if (security.underlyingSymbol == null || security.strikePrice == null || security.optionType == null || security.expiryDate == null) {
+                continue;
+            }
+
+            OptionContract contract = new OptionContract();
+            contract.symbol = security.symbol;
+            contract.underlying = security.underlyingSymbol;
+            contract.optionType = security.optionType;
+            contract.strike = security.strikePrice;
+            try {
+                contract.expiry = LocalDate.parse(security.expiryDate);
+            } catch (Exception ex) {
+                continue;
+            }
+
+            optionContractsByUnderlying
+                .computeIfAbsent(contract.underlying, k -> new CopyOnWriteArrayList<>())
+                .add(contract);
+        }
+
+        optionContractsByUnderlying.values().forEach(list ->
+            list.sort(Comparator.comparingDouble((OptionContract c) -> c.strike)
+                .thenComparing(c -> c.optionType)
+                .thenComparing(c -> c.expiry))
+        );
+
+        LOG.info("Loaded {} underlyings with option contracts", optionContractsByUnderlying.size());
+    }
+
+    private void updateOptionPricesForUnderlying(String underlying, double spotPrice, long timestamp) {
+        List<OptionContract> contracts = optionContractsByUnderlying.get(underlying);
+        if (contracts == null || contracts.isEmpty()) {
+            return;
+        }
+
+        for (OptionContract contract : contracts) {
+            double timeToExpiryDays = Math.max(1, ChronoUnit.DAYS.between(LocalDate.now(), contract.expiry));
+            double timeToExpiry = timeToExpiryDays / 365.0;
+            double volatility = estimateOptionVolatility(spotPrice, contract.strike);
+            boolean isCall = "CALL".equalsIgnoreCase(contract.optionType);
+            double theoPrice = isCall
+                ? pricingService.callPrice(spotPrice, contract.strike, timeToExpiry, 0.05, volatility)
+                : pricingService.putPrice(spotPrice, contract.strike, timeToExpiry, 0.05, volatility);
+
+            double boundedPrice = Math.max(0.01, theoPrice);
+            double spread = Math.max(0.01, boundedPrice * 0.01);
+            double bid = Math.max(0.01, boundedPrice - (spread / 2.0));
+            double ask = boundedPrice + (spread / 2.0);
+
+            MarketDataSnapshot last = lastSnapshots.get(contract.symbol);
+            double open = last != null ? last.open : boundedPrice;
+
+            MarketDataSnapshot snapshot = new MarketDataSnapshot();
+            snapshot.symbol = contract.symbol;
+            snapshot.lastPrice = round2(boundedPrice);
+            snapshot.bid = round2(bid);
+            snapshot.ask = round2(ask);
+            snapshot.open = round2(open);
+            snapshot.high = last != null ? Math.max(last.high, boundedPrice) : round2(boundedPrice);
+            snapshot.low = last != null ? Math.min(last.low, boundedPrice) : round2(boundedPrice);
+            snapshot.change = round2(snapshot.lastPrice - snapshot.open);
+            snapshot.changePercent = snapshot.open > 0
+                    ? round2((snapshot.lastPrice - snapshot.open) / snapshot.open * 100.0)
+                    : 0;
+            snapshot.volume = last != null ? last.volume + random.nextInt(100) : random.nextInt(10000);
+            snapshot.timestamp = timestamp;
+
+            lastSnapshots.put(contract.symbol, snapshot);
+            referenceDataService.updateMarketData(contract.symbol, snapshot.lastPrice, snapshot.bid, snapshot.ask);
+            notifyListeners(snapshot);
+
+            try {
+                webSocketAggregator.broadcastMarketData(
+                    contract.symbol,
+                    snapshot.lastPrice,
+                    snapshot.bid,
+                    snapshot.ask,
+                    snapshot.change,
+                    snapshot.changePercent
+                );
+            } catch (Exception e) {
+                LOG.debug("Could not broadcast option price update for {}", contract.symbol);
+            }
+        }
+    }
+
+    private double estimateOptionVolatility(double spot, double strike) {
+        double moneyness = strike / Math.max(spot, 0.01);
+        double skew = Math.abs(moneyness - 1.0);
+        return Math.min(0.80, 0.22 + (skew * 0.35));
+    }
+
+    private double round2(double value) {
+        return Math.round(value * 100.0) / 100.0;
+    }
     
     /**
      * Simulate price updates with realistic movement
@@ -265,6 +374,9 @@ public class MarketDataPoller {
                     
                     // Update reference data service
                     referenceDataService.updateMarketData(symbol, newPrice, snapshot.bid, snapshot.ask);
+
+                    // Reprice options linked to this underlying.
+                    updateOptionPricesForUnderlying(symbol, newPrice, snapshot.timestamp);
                 }
             }
         } catch (Exception e) {
@@ -411,6 +523,7 @@ public class MarketDataPoller {
         // Store and notify
         lastSnapshots.put(symbol, snapshot);
         notifyListeners(snapshot);
+        updateOptionPricesForUnderlying(symbol, tradePrice, snapshot.timestamp);
         
         // Broadcast via WebSocket
         try {
@@ -457,6 +570,14 @@ public class MarketDataPoller {
             return String.format("%s: %.2f (%.2f/%.2f) %+.2f (%.2f%%)", 
                     symbol, lastPrice, bid, ask, change, changePercent);
         }
+    }
+
+    private static class OptionContract {
+        String symbol;
+        String underlying;
+        String optionType;
+        double strike;
+        LocalDate expiry;
     }
     
     public interface MarketDataListener {

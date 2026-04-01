@@ -1,5 +1,7 @@
 package com.helesto.service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -32,6 +34,8 @@ public class ReferenceDataService {
     
     // Market data cache (latest prices)
     private final Map<String, MarketData> marketDataCache = new ConcurrentHashMap<>();
+
+    private static final DateTimeFormatter OPTION_EXPIRY = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     
     @PostConstruct
     public void init() {
@@ -154,11 +158,8 @@ public class ReferenceDataService {
         addSecurity("D", "Dominion Energy", "EQUITY", "UTILITIES", 0.01, 1, 10000000, true);
         addSecurity("AEP", "American Electric", "EQUITY", "UTILITIES", 0.01, 1, 10000000, true);
         
-        // Add some options
-        addSecurity("AAPL240315C00180000", "AAPL Call 180 Mar 2024", "OPTION", "TECHNOLOGY", 0.01, 1, 1000000, true);
-        addSecurity("AAPL240315P00170000", "AAPL Put 170 Mar 2024", "OPTION", "TECHNOLOGY", 0.01, 1, 1000000, true);
-        addSecurity("MSFT240315C00400000", "MSFT Call 400 Mar 2024", "OPTION", "TECHNOLOGY", 0.01, 1, 1000000, true);
-        addSecurity("NVDA240315C00750000", "NVDA Call 750 Mar 2024", "OPTION", "TECHNOLOGY", 0.01, 1, 1000000, true);
+        // Add option chains for major stocks.
+        initializeOptionUniverse();
         
         // Precious Metals
         addSecurity("XAUUSD", "Gold Spot", "COMMODITY", "PRECIOUS_METALS", 0.01, 1, 100000, true);
@@ -221,6 +222,54 @@ public class ReferenceDataService {
         security.tradeable = tradeable;
         security.currency = "USD";
         securityCache.put(symbol, security);
+    }
+
+    private void initializeOptionUniverse() {
+        LocalDate expiry1 = LocalDate.now().plusDays(45);
+        LocalDate expiry2 = LocalDate.now().plusDays(90);
+
+        addOptionChain("AAPL", "Apple Inc.", "TECHNOLOGY", new double[] {170.0, 180.0, 190.0}, expiry1, expiry2);
+        addOptionChain("MSFT", "Microsoft Corp.", "TECHNOLOGY", new double[] {360.0, 380.0, 400.0}, expiry1, expiry2);
+        addOptionChain("NVDA", "NVIDIA Corp.", "TECHNOLOGY", new double[] {680.0, 720.0, 760.0}, expiry1, expiry2);
+    }
+
+    private void addOptionChain(String underlying, String underlyingName, String sector,
+                                double[] strikes, LocalDate... expiries) {
+        for (LocalDate expiry : expiries) {
+            for (double strike : strikes) {
+                addOptionSecurity(underlying, underlyingName, sector, strike, expiry, "CALL");
+                addOptionSecurity(underlying, underlyingName, sector, strike, expiry, "PUT");
+            }
+        }
+    }
+
+    private void addOptionSecurity(String underlying, String underlyingName, String sector,
+                                   double strike, LocalDate expiry, String optionType) {
+        String symbol = formatOptionSymbol(underlying, expiry, optionType, strike);
+        String displayName = String.format("%s %s %.0f %s", underlyingName,
+                "CALL".equals(optionType) ? "Call" : "Put", strike, expiry.format(DateTimeFormatter.ofPattern("MMM yyyy")));
+
+        Security security = new Security();
+        security.symbol = symbol;
+        security.name = displayName;
+        security.securityType = "OPTION";
+        security.sector = sector;
+        security.tickSize = 0.01;
+        security.lotSize = 1;
+        security.maxOrderSize = 1000000;
+        security.tradeable = true;
+        security.currency = "USD";
+        security.underlyingSymbol = underlying;
+        security.strikePrice = strike;
+        security.expiryDate = expiry.format(OPTION_EXPIRY);
+        security.optionType = optionType;
+        securityCache.put(symbol, security);
+    }
+
+    private String formatOptionSymbol(String underlying, LocalDate expiry, String optionType, double strike) {
+        String yymmdd = expiry.format(DateTimeFormatter.ofPattern("yyMMdd"));
+        int strikeInt = (int) Math.round(strike * 1000);
+        return String.format("%s%s%s%08d", underlying, yymmdd, "CALL".equals(optionType) ? "C" : "P", strikeInt);
     }
     
     /**

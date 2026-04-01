@@ -18,6 +18,53 @@ interface MarketData {
   changePercent: number;
 }
 
+interface SecurityInfo {
+  symbol: string;
+  securityType: string;
+  tradeable: boolean;
+}
+
+interface ParsedOptionContract {
+  symbol: string;
+  underlying: string;
+  expiry: string;
+  optionType: 'C' | 'P';
+  strike: number;
+}
+
+interface OptionChainRow {
+  strike: number;
+  callSymbol?: string;
+  putSymbol?: string;
+  callQuote?: MarketData;
+  putQuote?: MarketData;
+}
+
+interface OptionHeatmapCell {
+  expiry: string;
+  intensity: number;
+  volume: number;
+  absMove: number;
+  hasData: boolean;
+}
+
+interface OptionHeatmapRow {
+  strike: number;
+  cells: OptionHeatmapCell[];
+}
+
+interface StagedOptionOrder {
+  symbol: string;
+  side: '1' | '2';
+  quantity: number;
+  price: number;
+  underlying: string;
+  strike: number;
+  expiry: string;
+  optionType: 'CALL' | 'PUT';
+  stagedAt: Date;
+}
+
 interface Position {
   symbol: string;
   quantity: number;
@@ -90,6 +137,26 @@ export class AppComponent implements OnInit, OnDestroy {
     'XOM', 'CVX', 'COP', 'SLB', 'EOG', 'PXD', 'MPC', 'VLO', 'PSX', 'OXY',
     // Consumer & Retail
     'WMT', 'HD', 'NKE', 'MCD', 'SBUX', 'TGT', 'COST', 'LOW', 'DIS', 'CMCSA'
+  ];
+  optionSymbols: string[] = [];
+  optionUnderlyingChoices: string[] = [];
+  optionExpiryChoices: string[] = [];
+  optionChainRows: OptionChainRow[] = [];
+  selectedOptionUnderlying = '';
+  selectedOptionExpiry = 'ALL';
+  selectedOptionStrike: number | null = null;
+  optionQuickQuantity = 10;
+  optionStrikeWindow = 2;
+  optionChainSort: 'strike' | 'change' | 'volume' = 'strike';
+  optionHeatmapExpiries: string[] = [];
+  optionHeatmapRows: OptionHeatmapRow[] = [];
+  stagedOptionOrder: StagedOptionOrder | null = null;
+
+  readonly optionStrikeWindowChoices = [
+    { label: 'All strikes', value: 0 },
+    { label: 'ATM +/- 1', value: 1 },
+    { label: 'ATM +/- 2', value: 2 },
+    { label: 'ATM +/- 3', value: 3 }
   ];
   
   // Live news articles
@@ -193,6 +260,7 @@ export class AppComponent implements OnInit, OnDestroy {
     // Load everything immediately
     this.loadOrders();
     this.loadSessionInfo();
+    this.loadTradableSymbols();
     this.loadMarketData();
     this.loadNewsArticles();
     this.loadSectorPerformance();
@@ -313,7 +381,36 @@ export class AppComponent implements OnInit, OnDestroy {
     this.http.get<MarketData[]>('http://localhost:8090/api/marketdata').pipe(
       catchError(() => of([]))
     ).subscribe(data => {
-      this.marketData = data.slice(0, 20); // Show top 20 in ticker
+      this.marketData = data;
+      this.buildOptionChainRows();
+      this.calculatePositions();
+      this.updateTopMovers();
+    });
+  }
+
+  loadTradableSymbols(): void {
+    this.http.get<SecurityInfo[]>('http://localhost:8090/api/securities').pipe(
+      catchError(() => of([]))
+    ).subscribe(securities => {
+      if (!securities.length) {
+        return;
+      }
+
+      const equities = securities
+        .filter(s => s.tradeable && s.securityType !== 'OPTION')
+        .map(s => s.symbol)
+        .sort((a, b) => a.localeCompare(b));
+      const options = securities
+        .filter(s => s.tradeable && s.securityType === 'OPTION')
+        .map(s => s.symbol)
+        .sort((a, b) => a.localeCompare(b));
+
+      if (equities.length) {
+        this.allSymbols = [...equities, ...options];
+        this.quickSymbols = equities.slice(0, 8);
+      }
+      this.optionSymbols = options;
+      this.buildOptionChainRows();
     });
   }
   
@@ -323,7 +420,10 @@ export class AppComponent implements OnInit, OnDestroy {
         catchError(() => of([]))
       ))
     ).subscribe(data => {
-      this.marketData = data.slice(0, 20);
+      this.marketData = data;
+      this.buildOptionChainRows();
+      this.calculatePositions();
+      this.updateTopMovers();
       // Check price alerts
       this.watchlistService.checkAlerts(this.marketData);
     });
@@ -654,38 +754,16 @@ export class AppComponent implements OnInit, OnDestroy {
   @HostListener('document:keydown', ['$event'])
   handleKeyboardShortcut(event: KeyboardEvent): void {
     // Don't trigger shortcuts when typing in inputs
-    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) {
+    if (this.isTypingTarget(event)) {
       return;
     }
-    
-    // Ctrl + E = Export CSV
-    if (event.ctrlKey && event.key === 'e') {
-      event.preventDefault();
-      this.exportTradesToCSV();
+
+    if (this.handleGeneralShortcuts(event)) {
+      return;
     }
-    
-    // Ctrl + W = Toggle Watchlist
-    if (event.ctrlKey && event.key === 'w') {
-      event.preventDefault();
-      this.toggleWatchlistPanel();
-    }
-    
-    // Ctrl + A = Toggle Alerts (but not select all)
-    if (event.ctrlKey && event.shiftKey && event.key === 'A') {
-      event.preventDefault();
-      this.toggleAlertsPanel();
-    }
-    
-    // Ctrl + B = Quick Buy
-    if (event.ctrlKey && event.key === 'b') {
-      event.preventDefault();
-      this.quickBuy(this.newOrder.symbol, this.newOrder.quantity);
-    }
-    
-    // Ctrl + R = Refresh
-    if (event.ctrlKey && event.key === 'r') {
-      event.preventDefault();
-      this.refreshOrders();
+
+    if (this.handleOptionShortcuts(event)) {
+      return;
     }
     
     // Escape = Close panels
@@ -695,6 +773,91 @@ export class AppComponent implements OnInit, OnDestroy {
       this.showLoginForm = false;
       this.showHotkeysPanel = false;
     }
+  }
+
+  private isTypingTarget(event: KeyboardEvent): boolean {
+    return event.target instanceof HTMLInputElement
+      || event.target instanceof HTMLSelectElement
+      || event.target instanceof HTMLTextAreaElement;
+  }
+
+  private handleGeneralShortcuts(event: KeyboardEvent): boolean {
+    const key = event.key.toLowerCase();
+
+    if (event.ctrlKey && key === 'e') {
+      event.preventDefault();
+      this.exportTradesToCSV();
+      return true;
+    }
+
+    if (event.ctrlKey && key === 'w') {
+      event.preventDefault();
+      this.toggleWatchlistPanel();
+      return true;
+    }
+
+    if (event.ctrlKey && event.shiftKey && key === 'a') {
+      event.preventDefault();
+      this.toggleAlertsPanel();
+      return true;
+    }
+
+    if (event.ctrlKey && key === 'b') {
+      event.preventDefault();
+      this.quickBuy(this.newOrder.symbol, this.newOrder.quantity);
+      return true;
+    }
+
+    if (event.ctrlKey && key === 'r') {
+      event.preventDefault();
+      this.refreshOrders();
+      return true;
+    }
+
+    return false;
+  }
+
+  private handleOptionShortcuts(event: KeyboardEvent): boolean {
+    const shortcut = this.resolveOptionShortcut(event);
+    if (!shortcut) {
+      return false;
+    }
+
+    event.preventDefault();
+    if (shortcut.mode === 'stage') {
+      this.stageSelectedOptionOrder(shortcut.contractType, shortcut.side);
+    } else {
+      this.executeSelectedOptionOrder(shortcut.contractType, shortcut.side);
+    }
+    return true;
+  }
+
+  private resolveOptionShortcut(event: KeyboardEvent): {
+    mode: 'stage' | 'execute';
+    contractType: 'CALL' | 'PUT';
+    side: '1' | '2';
+  } | null {
+    const shortcuts: Record<string, { contractType: 'CALL' | 'PUT'; side: '1' | '2' }> = {
+      Digit1: { contractType: 'CALL', side: '1' },
+      Digit2: { contractType: 'CALL', side: '2' },
+      Digit3: { contractType: 'PUT', side: '1' },
+      Digit4: { contractType: 'PUT', side: '2' }
+    };
+
+    const action = shortcuts[event.code];
+    if (!action) {
+      return null;
+    }
+
+    if (event.ctrlKey && event.shiftKey) {
+      return { mode: 'stage', ...action };
+    }
+
+    if (event.altKey) {
+      return { mode: 'execute', ...action };
+    }
+
+    return null;
   }
   
   // Performance Analytics Methods
@@ -741,8 +904,7 @@ export class AppComponent implements OnInit, OnDestroy {
   
   // Quick Trade Methods
   quickBuy(symbol: string, qty: number): void {
-    const stock = this.marketData.find(s => s.symbol === symbol);
-    const price = stock ? stock.lastPrice : 100;
+    const price = this.getExecutablePrice(symbol, '1');
     const order: any = {
       clOrdId: 'ORD-' + Date.now() + '-QB',
       symbol: symbol,
@@ -766,8 +928,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
   
   quickSell(symbol: string, qty: number): void {
-    const stock = this.marketData.find(s => s.symbol === symbol);
-    const price = stock ? stock.lastPrice : 100;
+    const price = this.getExecutablePrice(symbol, '2');
     const order: any = {
       clOrdId: 'ORD-' + Date.now() + '-QS',
       symbol: symbol,
@@ -837,6 +998,529 @@ export class AppComponent implements OnInit, OnDestroy {
   getSpread(): number {
     const stock = this.marketData.find(s => s.symbol === this.depthSymbol);
     return stock ? (stock.ask - stock.bid) : 0.05;
+  }
+
+  onOptionUnderlyingChange(): void {
+    this.selectedOptionExpiry = 'ALL';
+    this.selectedOptionStrike = null;
+    this.buildOptionChainRows();
+  }
+
+  onOptionExpiryChange(): void {
+    this.selectedOptionStrike = null;
+    this.buildOptionChainRows();
+  }
+
+  onOptionStrikeWindowChange(): void {
+    this.selectedOptionStrike = null;
+    this.buildOptionChainRows();
+  }
+
+  onOptionChainSortChange(): void {
+    this.buildOptionChainRows();
+  }
+
+  incrementOptionQuantity(step: number): void {
+    this.optionQuickQuantity = Math.max(1, Math.min(200, this.optionQuickQuantity + step));
+  }
+
+  selectOptionStrike(strike: number): void {
+    this.selectedOptionStrike = strike;
+  }
+
+  selectOptionSymbol(symbol?: string): void {
+    if (!symbol) {
+      return;
+    }
+    this.newOrder.symbol = symbol;
+  }
+
+  stageOptionOrder(symbol: string | undefined, side: '1' | '2'): void {
+    if (!symbol) {
+      return;
+    }
+
+    const executablePrice = this.getExecutablePrice(symbol, side);
+    const parsed = this.parseOptionSymbol(symbol);
+
+    this.newOrder.symbol = symbol;
+    this.newOrder.side = side;
+    this.newOrder.quantity = this.optionQuickQuantity;
+    this.newOrder.price = executablePrice;
+
+    if (parsed) {
+      this.depthSymbol = parsed.underlying;
+      this.stagedOptionOrder = {
+        symbol,
+        side,
+        quantity: this.optionQuickQuantity,
+        price: executablePrice,
+        underlying: parsed.underlying,
+        strike: parsed.strike,
+        expiry: parsed.expiry,
+        optionType: parsed.optionType === 'C' ? 'CALL' : 'PUT',
+        stagedAt: new Date()
+      };
+    } else {
+      this.stagedOptionOrder = null;
+    }
+
+    const sideLabel = side === '1' ? 'BUY' : 'SELL';
+    this.notificationService.info(
+      'Order Staged',
+      `${sideLabel} ${this.optionQuickQuantity} ${symbol} @ $${this.newOrder.price.toFixed(2)}`
+    );
+  }
+
+  applyStagedOptionToForm(): void {
+    if (!this.stagedOptionOrder) {
+      return;
+    }
+
+    this.newOrder.symbol = this.stagedOptionOrder.symbol;
+    this.newOrder.side = this.stagedOptionOrder.side;
+    this.newOrder.quantity = this.stagedOptionOrder.quantity;
+    this.newOrder.price = this.stagedOptionOrder.price;
+    this.depthSymbol = this.stagedOptionOrder.underlying;
+  }
+
+  submitStagedOptionOrder(): void {
+    if (!this.stagedOptionOrder) {
+      return;
+    }
+
+    const { symbol, side, quantity } = this.stagedOptionOrder;
+    if (side === '1') {
+      this.quickBuy(symbol, quantity);
+    } else {
+      this.quickSell(symbol, quantity);
+    }
+  }
+
+  clearStagedOptionOrder(): void {
+    this.stagedOptionOrder = null;
+  }
+
+  getOptionHeatmapCellStyle(cell: OptionHeatmapCell): string {
+    if (!cell.hasData) {
+      return 'rgba(148, 163, 184, 0.08)';
+    }
+    const boosted = Math.pow(this.clamp(cell.intensity, 0, 1), 0.82);
+    return `rgba(14, 116, 144, ${0.1 + boosted * 0.6})`;
+  }
+
+  private stageSelectedOptionOrder(contractType: 'CALL' | 'PUT', side: '1' | '2'): void {
+    const row = this.getSelectedOptionRow();
+    if (!row) {
+      return;
+    }
+
+    const symbol = contractType === 'CALL' ? row.callSymbol : row.putSymbol;
+    this.stageOptionOrder(symbol, side);
+  }
+
+  private executeSelectedOptionOrder(contractType: 'CALL' | 'PUT', side: '1' | '2'): void {
+    const row = this.getSelectedOptionRow();
+    if (!row) {
+      return;
+    }
+
+    const symbol = contractType === 'CALL' ? row.callSymbol : row.putSymbol;
+    if (!symbol) {
+      return;
+    }
+
+    if (side === '1') {
+      this.quickBuyOption(symbol);
+    } else {
+      this.quickSellOption(symbol);
+    }
+  }
+
+  quickBuyOption(symbol?: string): void {
+    if (!symbol) {
+      return;
+    }
+    this.newOrder.symbol = symbol;
+    this.newOrder.price = this.getExecutablePrice(symbol, '1');
+    this.quickBuy(symbol, this.optionQuickQuantity);
+  }
+
+  quickSellOption(symbol?: string): void {
+    if (!symbol) {
+      return;
+    }
+    this.newOrder.symbol = symbol;
+    this.newOrder.price = this.getExecutablePrice(symbol, '2');
+    this.quickSell(symbol, this.optionQuickQuantity);
+  }
+
+  getOptionMid(quote?: MarketData): number {
+    if (!quote) {
+      return 0;
+    }
+    return (quote.bid + quote.ask) / 2;
+  }
+
+  getOptionSpreadFromQuote(quote?: MarketData): number {
+    if (!quote) {
+      return 0;
+    }
+    return Math.max(0, quote.ask - quote.bid);
+  }
+
+  getOptionDelta(symbol?: string): number {
+    const contract = symbol ? this.parseOptionSymbol(symbol) : null;
+    if (!contract) {
+      return 0;
+    }
+
+    const spot = this.getMarketPrice(contract.underlying);
+    if (spot <= 0 || contract.strike <= 0) {
+      return 0;
+    }
+
+    const moneyness = Math.log(spot / contract.strike);
+    const days = this.getDaysToOptionExpiry(contract.expiry);
+    const timeBoost = Math.min(0.25, 30 / Math.max(1, days) * 0.03);
+
+    if (contract.optionType === 'C') {
+      const callDelta = 0.5 + moneyness * 2.1 + timeBoost;
+      return this.clamp(callDelta, 0.02, 0.98);
+    }
+
+    const putDelta = -0.5 + moneyness * 2.1 - timeBoost;
+    return this.clamp(putDelta, -0.98, -0.02);
+  }
+
+  getOptionTheta(symbol?: string): number {
+    const contract = symbol ? this.parseOptionSymbol(symbol) : null;
+    if (!contract) {
+      return 0;
+    }
+
+    const spot = this.getMarketPrice(contract.underlying);
+    if (spot <= 0 || contract.strike <= 0) {
+      return 0;
+    }
+
+    const quote = this.marketData.find(m => m.symbol === contract.symbol);
+    const premium = quote?.lastPrice ?? Math.max(0.1, Math.abs(spot - contract.strike) * 0.1);
+    const days = this.getDaysToOptionExpiry(contract.expiry);
+
+    // Approximate daily time-decay for demo UI: larger as expiry approaches.
+    const thetaMagnitude = premium / Math.max(5, days * 0.7);
+    return -thetaMagnitude;
+  }
+
+  isOptionStrikeInTheMoney(strike: number, optionType: 'CALL' | 'PUT'): boolean {
+    const spot = this.getMarketPrice(this.selectedOptionUnderlying);
+    if (spot <= 0) {
+      return false;
+    }
+    return optionType === 'CALL' ? strike < spot : strike > spot;
+  }
+
+  formatOptionExpiry(expiry: string): string {
+    if (!/^\d{6}$/.test(expiry)) {
+      return expiry;
+    }
+
+    const year = Number(expiry.slice(0, 2));
+    const month = Number(expiry.slice(2, 4));
+    const day = Number(expiry.slice(4, 6));
+    const fullYear = 2000 + year;
+    const dt = new Date(fullYear, month - 1, day);
+
+    if (Number.isNaN(dt.getTime())) {
+      return expiry;
+    }
+
+    return dt.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  }
+
+  getOptionContractLabel(symbol?: string): string {
+    if (!symbol) {
+      return 'N/A';
+    }
+
+    const parsed = this.parseOptionSymbol(symbol);
+    if (!parsed) {
+      return symbol;
+    }
+
+    const typeLabel = parsed.optionType === 'C' ? 'Call' : 'Put';
+    return `${typeLabel} ${parsed.strike.toFixed(0)}`;
+  }
+
+  private buildOptionChainRows(): void {
+    const parsedContracts = this.optionSymbols
+      .map(symbol => this.parseOptionSymbol(symbol))
+      .filter((contract): contract is ParsedOptionContract => contract !== null);
+
+    const underlyingChoices = Array.from(new Set(parsedContracts.map(c => c.underlying)))
+      .sort((a, b) => a.localeCompare(b));
+    this.optionUnderlyingChoices = underlyingChoices;
+
+    if (!underlyingChoices.length) {
+      this.selectedOptionUnderlying = '';
+      this.optionExpiryChoices = [];
+      this.optionChainRows = [];
+      this.selectedOptionStrike = null;
+      return;
+    }
+
+    if (!this.selectedOptionUnderlying || !underlyingChoices.includes(this.selectedOptionUnderlying)) {
+      this.selectedOptionUnderlying = underlyingChoices[0];
+    }
+
+    const forUnderlying = parsedContracts.filter(c => c.underlying === this.selectedOptionUnderlying);
+    const expiryChoices = Array.from(new Set(forUnderlying.map(c => c.expiry)))
+      .sort((a, b) => a.localeCompare(b));
+    this.optionExpiryChoices = expiryChoices;
+
+    const validExpiryValues = new Set(['ALL', ...expiryChoices]);
+    if (!validExpiryValues.has(this.selectedOptionExpiry)) {
+      this.selectedOptionExpiry = 'ALL';
+    }
+
+    const filteredContracts = this.selectedOptionExpiry === 'ALL'
+      ? forUnderlying
+      : forUnderlying.filter(c => c.expiry === this.selectedOptionExpiry);
+
+    const quoteBySymbol = new Map(this.marketData.map(quote => [quote.symbol, quote]));
+    const spot = this.getMarketPrice(this.selectedOptionUnderlying);
+    this.buildOptionHeatmap(forUnderlying, quoteBySymbol, spot);
+    const rowMap = new Map<number, OptionChainRow>();
+
+    for (const contract of filteredContracts) {
+      const row = rowMap.get(contract.strike) ?? { strike: contract.strike };
+
+      if (contract.optionType === 'C') {
+        row.callSymbol = contract.symbol;
+        row.callQuote = quoteBySymbol.get(contract.symbol);
+      } else {
+        row.putSymbol = contract.symbol;
+        row.putQuote = quoteBySymbol.get(contract.symbol);
+      }
+
+      rowMap.set(contract.strike, row);
+    }
+
+    const allRows = Array.from(rowMap.values()).sort((a, b) => a.strike - b.strike);
+
+    const nearest = allRows.length
+      ? allRows.reduce((best, row) => Math.abs(row.strike - spot) < Math.abs(best.strike - spot) ? row : best, allRows[0])
+      : null;
+
+    const nearestStrike = nearest?.strike ?? null;
+    const nearestIndex = nearestStrike === null ? -1 : allRows.findIndex(row => row.strike === nearestStrike);
+
+    const filteredRows = this.optionStrikeWindow > 0 && nearestIndex >= 0
+      ? allRows.filter((_, index) => Math.abs(index - nearestIndex) <= this.optionStrikeWindow)
+      : allRows;
+
+    const sortedRows = [...filteredRows].sort((a, b) => {
+      if (this.optionChainSort === 'change') {
+        const aChange = Math.max(
+          Math.abs(a.callQuote?.changePercent ?? 0),
+          Math.abs(a.putQuote?.changePercent ?? 0)
+        );
+        const bChange = Math.max(
+          Math.abs(b.callQuote?.changePercent ?? 0),
+          Math.abs(b.putQuote?.changePercent ?? 0)
+        );
+        return bChange - aChange;
+      }
+
+      if (this.optionChainSort === 'volume') {
+        const aVol = (a.callQuote?.volume ?? 0) + (a.putQuote?.volume ?? 0);
+        const bVol = (b.callQuote?.volume ?? 0) + (b.putQuote?.volume ?? 0);
+        return bVol - aVol;
+      }
+
+      return a.strike - b.strike;
+    });
+
+    this.optionChainRows = sortedRows;
+
+    if (!this.optionChainRows.length) {
+      this.selectedOptionStrike = null;
+      return;
+    }
+
+    const hasCurrentSelection = this.selectedOptionStrike !== null
+      && this.optionChainRows.some(row => row.strike === this.selectedOptionStrike);
+    if (hasCurrentSelection) {
+      return;
+    }
+
+    this.selectedOptionStrike = nearestStrike ?? this.optionChainRows[0].strike;
+  }
+
+  private buildOptionHeatmap(
+    contracts: ParsedOptionContract[],
+    quoteBySymbol: Map<string, MarketData>,
+    spot: number
+  ): void {
+    const scopedContracts = this.selectedOptionExpiry === 'ALL'
+      ? contracts
+      : contracts.filter(contract => contract.expiry === this.selectedOptionExpiry);
+
+    const expiries = Array.from(new Set(scopedContracts.map(contract => contract.expiry)))
+      .sort((a, b) => a.localeCompare(b));
+
+    const allStrikes = Array.from(new Set(scopedContracts.map(contract => contract.strike)))
+      .sort((a, b) => a - b);
+
+    if (!expiries.length || !allStrikes.length) {
+      this.optionHeatmapExpiries = [];
+      this.optionHeatmapRows = [];
+      return;
+    }
+
+    const nearestStrike = allStrikes.reduce((best, strike) =>
+      Math.abs(strike - spot) < Math.abs(best - spot) ? strike : best,
+      allStrikes[0]
+    );
+
+    const nearestIndex = allStrikes.indexOf(nearestStrike);
+    const strikes = this.optionStrikeWindow > 0 && nearestIndex >= 0
+      ? allStrikes.filter((_, index) => Math.abs(index - nearestIndex) <= this.optionStrikeWindow + 1)
+      : allStrikes;
+
+    type Pair = { callSymbol?: string; putSymbol?: string };
+    const pairByExpiryStrike = new Map<string, Pair>();
+
+    for (const contract of scopedContracts) {
+      const key = `${contract.expiry}|${contract.strike}`;
+      const pair = pairByExpiryStrike.get(key) ?? {};
+      if (contract.optionType === 'C') {
+        pair.callSymbol = contract.symbol;
+      } else {
+        pair.putSymbol = contract.symbol;
+      }
+      pairByExpiryStrike.set(key, pair);
+    }
+
+    const rowsWithRaw = strikes.map(strike => {
+      const cells = expiries.map(expiry => {
+        const key = `${expiry}|${strike}`;
+        const pair = pairByExpiryStrike.get(key);
+        const callQuote = pair?.callSymbol ? quoteBySymbol.get(pair.callSymbol) : undefined;
+        const putQuote = pair?.putSymbol ? quoteBySymbol.get(pair.putSymbol) : undefined;
+
+        const volume = (callQuote?.volume ?? 0) + (putQuote?.volume ?? 0);
+        const absMove = Math.max(
+          Math.abs(callQuote?.changePercent ?? 0),
+          Math.abs(putQuote?.changePercent ?? 0)
+        );
+        const moveScore = this.clamp(absMove / 4.5, 0, 1);
+        const flowScore = this.clamp(Math.log10(volume + 1) / 4, 0, 1);
+        const rawIntensity = moveScore * 0.72 + flowScore * 0.28;
+        const hasData = !!callQuote || !!putQuote;
+
+        return {
+          expiry,
+          intensity: rawIntensity,
+          volume,
+          absMove,
+          hasData
+        } as OptionHeatmapCell;
+      });
+
+      return { strike, cells };
+    });
+
+    const intensitySamples = rowsWithRaw
+      .flatMap(row => row.cells)
+      .filter(cell => cell.hasData)
+      .map(cell => cell.intensity)
+      .sort((a, b) => a - b);
+
+    const percentile90 = intensitySamples.length
+      ? intensitySamples[Math.floor((intensitySamples.length - 1) * 0.9)]
+      : 0;
+    const normalizer = Math.max(percentile90, 0.0001);
+
+    this.optionHeatmapExpiries = expiries;
+    this.optionHeatmapRows = rowsWithRaw.map(row => ({
+      strike: row.strike,
+      cells: row.cells.map(cell => ({
+        ...cell,
+        intensity: cell.hasData ? Math.pow(this.clamp(cell.intensity / normalizer, 0, 1), 0.78) : 0
+      }))
+    }));
+  }
+
+  private parseOptionSymbol(symbol: string): ParsedOptionContract | null {
+    const match = /^([A-Z]+)(\d{6})([CP])(\d{8})$/.exec(symbol);
+    if (!match) {
+      return null;
+    }
+
+    const strike = Number(match[4]) / 1000;
+    return {
+      symbol,
+      underlying: match[1],
+      expiry: match[2],
+      optionType: match[3] as 'C' | 'P',
+      strike
+    };
+  }
+
+  private getSelectedOptionRow(): OptionChainRow | undefined {
+    if (this.selectedOptionStrike === null) {
+      return undefined;
+    }
+    return this.optionChainRows.find(row => row.strike === this.selectedOptionStrike);
+  }
+
+  private getExecutablePrice(symbol: string, side: '1' | '2'): number {
+    const quote = this.marketData.find(s => s.symbol === symbol);
+    if (!quote) {
+      return 100;
+    }
+
+    const preferred = side === '1' ? quote.ask : quote.bid;
+    if (preferred > 0) {
+      return preferred;
+    }
+    if (quote.lastPrice > 0) {
+      return quote.lastPrice;
+    }
+    return 100;
+  }
+
+  private getDaysToOptionExpiry(expiry: string): number {
+    const dt = this.parseOptionExpiry(expiry);
+    if (!dt) {
+      return 30;
+    }
+
+    const ms = dt.getTime() - Date.now();
+    return Math.max(1, Math.ceil(ms / (24 * 60 * 60 * 1000)));
+  }
+
+  private parseOptionExpiry(expiry: string): Date | null {
+    if (!/^\d{6}$/.test(expiry)) {
+      return null;
+    }
+
+    const year = Number(expiry.slice(0, 2));
+    const month = Number(expiry.slice(2, 4));
+    const day = Number(expiry.slice(4, 6));
+    const fullYear = 2000 + year;
+    const dt = new Date(fullYear, month - 1, day);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  }
+
+  private clamp(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value));
   }
 
   // News and Market Data Methods

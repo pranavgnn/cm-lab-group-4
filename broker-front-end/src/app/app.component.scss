@@ -625,6 +625,84 @@ $transition-slow: 0.3s ease;
   padding: 20px;
 }
 
+.staged-option-section {
+  background: $bg-card;
+  border: 1px solid $border-color;
+  border-radius: $radius-lg;
+  padding: 16px;
+}
+
+.section-header.compact {
+  margin-bottom: 12px;
+}
+
+.staged-order-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+
+  div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid $border-color;
+    border-radius: $radius-sm;
+    padding: 8px;
+    background: $bg-muted;
+  }
+
+  span {
+    font-size: 11px;
+    color: $text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  strong {
+    font-size: 12px;
+    color: $text-primary;
+    font-family: 'SF Mono', 'Consolas', monospace;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+}
+
+.staged-order-actions {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+
+  button {
+    height: 34px;
+    border-radius: $radius-sm;
+    border: 1px solid transparent;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+}
+
+.btn-stage-apply {
+  background: rgba($primary, 0.1);
+  border-color: rgba($primary, 0.3) !important;
+  color: $primary;
+}
+
+.btn-stage-submit {
+  background: rgba($success, 0.12);
+  border-color: rgba($success, 0.3) !important;
+  color: $success;
+}
+
+.btn-stage-clear {
+  background: rgba($danger, 0.1);
+  border-color: rgba($danger, 0.3) !important;
+  color: $danger;
+}
+
 .depth-select {
   padding: 8px 12px;
   border: 1px solid $border-color;
@@ -711,6 +789,484 @@ $transition-slow: 0.3s ease;
   font-weight: 700;
   color: $primary;
   font-family: 'SF Mono', 'Consolas', monospace;
+}
+
+// Options Chain
+.options-chain-section {
+  background: $bg-card;
+  border: 1px solid $border-color;
+  border-radius: $radius-lg;
+  padding: 20px;
+}
+
+.options-chain-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+
+  select {
+    height: 36px;
+    border: 1px solid $border-color;
+    border-radius: $radius-md;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: $text-primary;
+    background: $bg-card;
+
+    &:focus {
+      outline: none;
+      border-color: $primary;
+    }
+  }
+}
+
+.option-quantity-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.qty-label {
+  font-size: 11px;
+  color: $text-muted;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.qty-stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid $border-color;
+  border-radius: $radius-md;
+  overflow: hidden;
+
+  button {
+    width: 30px;
+    height: 28px;
+    border: none;
+    background: $bg-muted;
+    color: $text-primary;
+    font-weight: 700;
+    cursor: pointer;
+
+    &:hover {
+      background: rgba($primary, 0.12);
+      color: $primary;
+    }
+  }
+
+  span {
+    min-width: 32px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: $text-primary;
+    font-family: 'SF Mono', 'Consolas', monospace;
+    padding: 0 8px;
+  }
+}
+
+.options-spot-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid rgba($primary, 0.2);
+  background: rgba($primary, 0.05);
+  border-radius: $radius-md;
+  margin-bottom: 12px;
+}
+
+.spot-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: $text-muted;
+}
+
+.spot-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: $text-primary;
+  font-family: 'SF Mono', 'Consolas', monospace;
+}
+
+.options-chain-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.options-heatmap {
+  border: 1px solid $border-color;
+  border-radius: $radius-md;
+  padding: 10px;
+  background: $bg-muted;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.heatmap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.heatmap-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: $text-primary;
+}
+
+.heatmap-subtitle {
+  font-size: 10px;
+  color: $text-muted;
+}
+
+.heatmap-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: max-content;
+}
+
+.heatmap-row {
+  display: grid;
+  grid-template-columns: 76px repeat(auto-fit, minmax(86px, 1fr));
+  gap: 4px;
+}
+
+.heatmap-label-row {
+  .heatmap-expiry-cell,
+  .heatmap-strike-cell {
+    background: transparent;
+    border: none;
+    color: $text-muted;
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+}
+
+.heatmap-strike-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid $border-color;
+  border-radius: $radius-sm;
+  font-size: 11px;
+  font-weight: 700;
+  color: $text-secondary;
+  font-family: 'SF Mono', 'Consolas', monospace;
+}
+
+.heatmap-expiry-cell,
+.heatmap-data-cell {
+  min-height: 46px;
+  border: 1px solid $border-color;
+  border-radius: $radius-sm;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 4px;
+}
+
+.heatmap-expiry-cell {
+  white-space: nowrap;
+}
+
+.heatmap-data-cell {
+  span {
+    font-size: 11px;
+    font-weight: 700;
+    color: $text-primary;
+    font-family: 'SF Mono', 'Consolas', monospace;
+  }
+
+  small {
+    font-size: 10px;
+    color: $text-secondary;
+  }
+}
+
+.options-chain-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid $border-color;
+  border-radius: $radius-md;
+  background: $bg-muted;
+  cursor: pointer;
+  transition: border-color $transition-fast, box-shadow $transition-fast;
+
+  &.selected {
+    border-color: rgba($primary, 0.55);
+    box-shadow: 0 0 0 2px rgba($primary, 0.14);
+  }
+}
+
+.option-leg {
+  border: 1px solid transparent;
+  border-radius: $radius-sm;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  cursor: pointer;
+  transition: border-color $transition-fast, background $transition-fast;
+
+  &.itm {
+    border-color: rgba($success, 0.3);
+    background: rgba($success, 0.08);
+  }
+
+  &.put.itm {
+    border-color: rgba($danger, 0.25);
+    background: rgba($danger, 0.08);
+  }
+
+  &:hover {
+    border-color: rgba($primary, 0.3);
+  }
+}
+
+.leg-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: $text-secondary;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leg-select {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  color: $text-secondary;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  &:hover {
+    color: $primary;
+  }
+}
+
+.leg-price {
+  font-size: 13px;
+  font-weight: 700;
+  color: $text-primary;
+  font-family: 'SF Mono', 'Consolas', monospace;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+
+  &.muted {
+    color: $text-muted;
+    font-weight: 600;
+    font-family: inherit;
+  }
+}
+
+.leg-change {
+  font-size: 11px;
+  font-weight: 700;
+
+  &.positive {
+    color: $success;
+  }
+
+  &.negative {
+    color: $danger;
+  }
+}
+
+.leg-micro {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: $text-muted;
+  font-family: 'SF Mono', 'Consolas', monospace;
+}
+
+.leg-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.btn-leg {
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: $radius-sm;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &.buy {
+    color: $success;
+    background: rgba($success, 0.08);
+    border-color: rgba($success, 0.25);
+
+    &:hover:not(:disabled) {
+      background: rgba($success, 0.18);
+    }
+  }
+
+  &.sell {
+    color: $danger;
+    background: rgba($danger, 0.08);
+    border-color: rgba($danger, 0.25);
+
+    &:hover:not(:disabled) {
+      background: rgba($danger, 0.18);
+    }
+  }
+
+  &.stage {
+    color: $primary;
+    background: rgba($primary, 0.08);
+    border-color: rgba($primary, 0.22);
+
+    &:hover:not(:disabled) {
+      background: rgba($primary, 0.18);
+    }
+  }
+}
+
+.strike-cell {
+  min-width: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  margin: 0;
+  cursor: pointer;
+  appearance: none;
+  border-radius: $radius-sm;
+  background: rgba($primary, 0.08);
+  border: 1px solid rgba($primary, 0.2);
+
+  &:focus-visible {
+    outline: 2px solid rgba($primary, 0.4);
+    outline-offset: 1px;
+  }
+}
+
+.strike-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: $text-muted;
+  font-weight: 700;
+}
+
+.strike-value {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: $primary;
+  font-family: 'SF Mono', 'Consolas', monospace;
+}
+
+.options-empty {
+  border: 1px dashed $border-color;
+  border-radius: $radius-md;
+  padding: 14px;
+  text-align: center;
+  color: $text-muted;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .staged-order-grid {
+    grid-template-columns: 1fr;
+
+    div {
+      padding: 10px;
+    }
+
+    span {
+      font-size: 10px;
+    }
+
+    strong {
+      font-size: 13px;
+    }
+  }
+
+  .staged-order-actions {
+    grid-template-columns: 1fr;
+
+    button {
+      height: 40px;
+      font-size: 12px;
+    }
+  }
+
+  .options-chain-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .heatmap-row {
+    grid-template-columns: 64px repeat(auto-fit, minmax(74px, 1fr));
+  }
+
+  .heatmap-data-cell {
+    min-height: 42px;
+
+    span {
+      font-size: 10px;
+    }
+
+    small {
+      font-size: 9px;
+    }
+  }
+
+  .options-chain-row {
+    grid-template-columns: 1fr;
+  }
+
+  .strike-cell {
+    order: -1;
+    min-width: 0;
+    flex-direction: row;
+    gap: 8px;
+  }
 }
 
 // Positions & News Lists
@@ -844,6 +1400,8 @@ $transition-slow: 0.3s ease;
 }
 
 .panel-backdrop {
+  border: none;
+  padding: 0;
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);

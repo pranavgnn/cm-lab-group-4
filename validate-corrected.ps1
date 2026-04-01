@@ -1,5 +1,5 @@
-# Corrected Validation Script - Using Proper FIX Protocol Field Format
-# All orders must use FIX numeric codes per OrderManagementEndToEndTest.java
+# Corrected Validation Script - Using proven REST payload format
+# Uses LULD-compliant symbols and price ranges to avoid circuit-breaker rejects
 
 $BaseUrl = "http://localhost:8090/api"
 $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
@@ -13,17 +13,17 @@ function Log-Result {
     Add-Content -Path $ResultsFile -Value $LogMsg
 }
 
-# FIX Side codes: 1=BUY, 2=SELL
-# FIX OrderType codes: 1=MARKET, 2=LIMIT  
-# FIX TimeInForce codes: 0=DAY
+# REST payload format:
+# side = BUY/SELL
+# orderType = LIMIT/MARKET
 
 function Submit-OrderFix {
     param(
         [string]$Symbol,
         [decimal]$Price,
         [long]$Quantity,
-        [string]$Side = "1",           # 1=BUY, 2=SELL
-        [string]$OrderType = "2"       # 2=LIMIT
+        [string]$Side = "BUY",
+        [string]$OrderType = "LIMIT"
     )
     
     $clOrdId = "ORD-$(New-Guid)"
@@ -34,7 +34,6 @@ function Submit-OrderFix {
         quantity = [int]$Quantity
         price = [double]$Price
         orderType = $OrderType
-        timeInForce = "0"              # DAY order
         clientId = $ClientId
         clOrdId = $clOrdId
     } | ConvertTo-Json
@@ -57,17 +56,73 @@ function Submit-OrderFix {
         }
     }
     catch {
+        $details = ""
+        try {
+            $responseStream = $_.Exception.Response.GetResponseStream()
+            if ($responseStream) {
+                $reader = New-Object System.IO.StreamReader($responseStream)
+                $details = $reader.ReadToEnd()
+                $reader.Close()
+            }
+        } catch {
+            $details = ""
+        }
+
+        $errorText = $_.Exception.Message
+        if (-not $details -and $_.ErrorDetails -and $_.ErrorDetails.Message) {
+            $details = $_.ErrorDetails.Message
+        }
+        if ($details) {
+            $errorText = "$errorText | Response: $details"
+        }
+
         return @{
             success = $false
-            error = $_.Exception.Message
+            error = $errorText
             elapsedMs = -1
         }
     }
 }
 
+function Get-LuldSafePrice {
+    param(
+        [string]$Symbol,
+        [double]$FallbackPrice
+    )
+
+    try {
+        $response = Invoke-WebRequest -Uri "$BaseUrl/system/circuit-breakers/$Symbol/luld" -Method GET -UseBasicParsing -ErrorAction Stop
+        $luld = $response.Content | ConvertFrom-Json
+        $lower = [double]$luld.lowerLimit
+        $upper = [double]$luld.upperLimit
+
+        if ($lower -gt 0 -and $upper -gt $lower) {
+            # Bias near the lower band to reduce LULD_UPPER rejects during volatile periods.
+            return [Math]::Round($lower + (($upper - $lower) * 0.15), 2)
+        }
+    }
+    catch {
+        # Fall back to provided default if LULD endpoint is unavailable.
+    }
+
+    return [Math]::Round($FallbackPrice, 2)
+}
+
+function Resume-SymbolTrading {
+    param([string]$Symbol)
+
+    try {
+        $response = Invoke-WebRequest -Uri "$BaseUrl/system/circuit-breakers/$Symbol/resume" -Method POST -UseBasicParsing -ErrorAction Stop
+        return ($response.StatusCode -eq 200)
+    }
+    catch {
+        return $false
+    }
+}
+
 Log-Result "========================================" "START"
 Log-Result "CORRECTED VALIDATION TEST SUITE" "START"
-Log-Result "Using FIX Protocol Field Format" "START"
+Log-Result "Using REST side/orderType string format" "START"
 Log-Result "========================================" "START"
 
 # Verify backend connectivity
@@ -79,19 +134,29 @@ try {
     exit 1
 }
 
+Log-Result "Preparing symbols by clearing circuit-breaker halts" "INFO"
+foreach ($symbol in @("AAPL", "MSFT", "GOOGL", "AMZN")) {
+    $resumed = Resume-SymbolTrading -Symbol $symbol
+    if ($resumed) {
+        Log-Result "Resumed trading for $symbol" "INFO"
+    }
+}
+
 # ===== SIMPLE TEST: Submit 1 order to verify format =====
 Log-Result "" "SECTION"
 Log-Result "TEST 0: Verify API Format with Single Order" "SECTION"
 Log-Result "============================================" "SECTION"
 
-$testOrder = Submit-OrderFix -Symbol "GOOG" -Price 300.0 -Quantity 50 -Side "1"
+$aaplPrice = Get-LuldSafePrice -Symbol "AAPL" -FallbackPrice 175.0
+$testOrder = Submit-OrderFix -Symbol "AAPL" -Price $aaplPrice -Quantity 50 -Side "BUY"
 if ($testOrder.success) {
     Log-Result "SUCCESS: Order submitted with correct format" "PASS"
+    Log-Result "Price used: $aaplPrice" "INFO"
     Log-Result "Order Reference: $($testOrder.orderRef)" "PASS"
     Log-Result "Response: $($testOrder.response | ConvertTo-Json)" "INFO"
 } else {
     Log-Result "FAILED: $($testOrder.error)" "FAIL"
-    Log-Result "API format still incorrect - please verify" "WARN"
+    Log-Result "Order rejected due market/risk controls; verify LULD bands and halt state" "WARN"
     exit 1
 }
 
@@ -104,15 +169,20 @@ $burstOrders = @()
 $burstStart = Get-Date
 $successCount = 0
 $targetOrders = 400
-$symbols = @("GOOG", "AAPL", "MSFT")
-$prices = @(300.0, 150.0, 320.0)
+$symbols = @("AAPL", "MSFT", "GOOGL", "AMZN")
+$basePriceBySymbol = @{
+    "AAPL" = Get-LuldSafePrice -Symbol "AAPL" -FallbackPrice 175.0
+    "MSFT" = Get-LuldSafePrice -Symbol "MSFT" -FallbackPrice 370.0
+    "GOOGL" = Get-LuldSafePrice -Symbol "GOOGL" -FallbackPrice 138.0
+    "AMZN" = Get-LuldSafePrice -Symbol "AMZN" -FallbackPrice 172.0
+}
 
 Log-Result "Submitting $targetOrders orders rapidly..." "INFO"
 
 for ($i = 0; $i -lt $targetOrders; $i++) {
     $symbol = $symbols[$i % $symbols.Count]
-    $price = $prices[$i % $prices.Count]
-    $side = if ($i % 2 -eq 0) { "1" } else { "2" }  # Mix BUY/SELL
+    $price = [Math]::Round($basePriceBySymbol[$symbol] + (($i % 3) * 0.01), 2)
+    $side = if ($i % 2 -eq 0) { "BUY" } else { "SELL" }
     
     $result = Submit-OrderFix -Symbol $symbol -Price $price -Quantity 10 -Side $side
     
@@ -151,7 +221,8 @@ Log-Result "=================================" "SECTION"
 
 $latencies = @()
 for ($i = 0; $i -lt 10; $i++) {
-    $result = Submit-OrderFix -Symbol "TEST" -Price 100.0 -Quantity 1 -Side "1"
+    $latencyPrice = Get-LuldSafePrice -Symbol "AAPL" -FallbackPrice 175.0
+    $result = Submit-OrderFix -Symbol "AAPL" -Price $latencyPrice -Quantity 1 -Side "BUY"
     if ($result.success) {
         $latencies += $result.elapsedMs
         Log-Result "Order $($i+1) latency: $([Math]::Round($result.elapsedMs, 2))ms" "METRIC"
@@ -173,16 +244,16 @@ if ($latencies.Count -gt 0) {
 
 # ===== TEST CASE 1: GOOG BUY/SELL SCENARIOS =====
 Log-Result "" "SECTION"
-Log-Result "TEST CASE 1: GOOG BUY/SELL SCENARIOS" "SECTION"
+Log-Result "TEST CASE 1: GOOGL BUY/SELL SCENARIOS" "SECTION"
 Log-Result "=====================================" "SECTION"
 
 $tc1_orders = @()
 
-# Step 1: Enter 4 Buy GOOG orders at different prices
-Log-Result "Step 1: Entering 4 Buy GOOG orders" "STEP"
-$prices1 = @(307.00, 307.11, 307.111, 307.01)
+# Step 1: Enter 4 Buy GOOGL orders at different valid prices
+Log-Result "Step 1: Entering 4 Buy GOOGL orders" "STEP"
+$prices1 = @(138.00, 140.00, 143.00, 145.00)
 foreach ($price in $prices1) {
-    $result = Submit-OrderFix -Symbol "GOOG" -Price $price -Quantity 50 -Side "1"
+    $result = Submit-OrderFix -Symbol "GOOGL" -Price $price -Quantity 50 -Side "BUY"
     if ($result.success) {
         $tc1_orders += @{ ref = $result.orderRef; price = $price; side = "BUY"; qty = 50 }
         Log-Result "  BUY order: $($result.orderRef) @ $price" "PASS"
@@ -192,24 +263,24 @@ foreach ($price in $prices1) {
 }
 
 # Step 2: Second set of buy orders
-Log-Result "Step 2: Entering 2nd set of Buy GOOG orders" "STEP"
+Log-Result "Step 2: Entering 2nd set of Buy GOOGL orders" "STEP"
 foreach ($price in $prices1[0..1]) {
-    $result = Submit-OrderFix -Symbol "GOOG" -Price $price -Quantity 50 -Side "1"
+    $result = Submit-OrderFix -Symbol "GOOGL" -Price $price -Quantity 50 -Side "BUY"
     if ($result.success) {
         $tc1_orders += @{ ref = $result.orderRef; price = $price; side = "BUY"; qty = 50 }
     }
 }
 
 # Step 3: Sell order
-Log-Result "Step 3: Sell GOOG 105 @ 307.111" "STEP"
-$sell1 = Submit-OrderFix -Symbol "GOOG" -Price 307.111 -Quantity 105 -Side "2"
+Log-Result "Step 3: Sell GOOGL 105 @ 143" "STEP"
+$sell1 = Submit-OrderFix -Symbol "GOOGL" -Price 143.0 -Quantity 105 -Side "SELL"
 if ($sell1.success) {
     Log-Result "  SELL order: $($sell1.orderRef)" "PASS"
 }
 
 # Step 4: Buy from another price
-Log-Result "Step 4: Buy GOOG 200 @ 307.11" "STEP"
-$buy2 = Submit-OrderFix -Symbol "GOOG" -Price 307.11 -Quantity 200 -Side "1"
+Log-Result "Step 4: Buy GOOGL 200 @ 140" "STEP"
+$buy2 = Submit-OrderFix -Symbol "GOOGL" -Price 140.0 -Quantity 200 -Side "BUY"
 if ($buy2.success) {
     Log-Result "  BUY order: $($buy2.orderRef)" "PASS"
 }
@@ -230,7 +301,7 @@ Log-Result "" "SUMMARY"
 Log-Result "KEY FINDINGS:" "SUMMARY"
 Log-Result "- Orders Submitted: $successCount of $targetOrders" "SUMMARY"
 Log-Result "- Burst Throughput: $([Math]::Round($actualRate, 2)) orders/sec" "SUMMARY"
-Log-Result "- API Format: FIX Protocol numeric codes required" "SUMMARY"
+Log-Result "- API Format: REST BUY/SELL + LIMIT/MARKET strings" "SUMMARY"
 $statusMsg = if ($successCount -gt 0) { 'WORKING WITH CORRECTED FORMAT' } else { 'STILL FAILING' }
 Log-Result "- Status: $statusMsg" "SUMMARY"
 

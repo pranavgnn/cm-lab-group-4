@@ -300,6 +300,35 @@
           </app-order-form>
         </section>
 
+        <section class="section staged-option-section" *ngIf="stagedOptionOrder">
+          <div class="section-header compact">
+            <h2>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 11l3 3L22 4"/>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+              </svg>
+              Staged Option Order
+            </h2>
+          </div>
+
+          <div class="staged-order-grid">
+            <div><span>Symbol</span><strong>{{ stagedOptionOrder.symbol }}</strong></div>
+            <div><span>Side</span><strong>{{ getSideLabel(stagedOptionOrder.side) }}</strong></div>
+            <div><span>Qty</span><strong>{{ stagedOptionOrder.quantity }}</strong></div>
+            <div><span>Limit</span><strong>${{ stagedOptionOrder.price | number:'1.2-2' }}</strong></div>
+            <div><span>Underlying</span><strong>{{ stagedOptionOrder.underlying }}</strong></div>
+            <div><span>Strike</span><strong>${{ stagedOptionOrder.strike | number:'1.0-0' }}</strong></div>
+            <div><span>Type</span><strong>{{ stagedOptionOrder.optionType }}</strong></div>
+            <div><span>Expiry</span><strong>{{ formatOptionExpiry(stagedOptionOrder.expiry) }}</strong></div>
+          </div>
+
+          <div class="staged-order-actions">
+            <button type="button" class="btn-stage-apply" (click)="applyStagedOptionToForm()">Apply To Form</button>
+            <button type="button" class="btn-stage-submit" (click)="submitStagedOptionOrder()">Submit Now</button>
+            <button type="button" class="btn-stage-clear" (click)="clearStagedOptionOrder()">Clear</button>
+          </div>
+        </section>
+
         <!-- Order Book -->
         <section class="section depth-section">
           <div class="section-header">
@@ -343,6 +372,139 @@
               </div>
             </div>
           </div>
+        </section>
+
+        <!-- Options Chain -->
+        <section class="section options-chain-section" *ngIf="optionUnderlyingChoices.length > 0">
+          <div class="section-header">
+            <h2>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3v18h18"/>
+                <path d="M7 15l4-4 3 3 5-6"/>
+              </svg>
+              Options Chain
+            </h2>
+          </div>
+
+          <div class="options-chain-controls">
+            <select [(ngModel)]="selectedOptionUnderlying" (change)="onOptionUnderlyingChange()">
+              <option *ngFor="let sym of optionUnderlyingChoices" [value]="sym">{{ sym }}</option>
+            </select>
+            <select [(ngModel)]="selectedOptionExpiry" (change)="onOptionExpiryChange()">
+              <option value="ALL">All Expiries</option>
+              <option *ngFor="let expiry of optionExpiryChoices" [value]="expiry">{{ formatOptionExpiry(expiry) }}</option>
+            </select>
+            <select [(ngModel)]="optionStrikeWindow" (change)="onOptionStrikeWindowChange()">
+              <option *ngFor="let choice of optionStrikeWindowChoices" [ngValue]="choice.value">{{ choice.label }}</option>
+            </select>
+            <select [(ngModel)]="optionChainSort" (change)="onOptionChainSortChange()">
+              <option value="strike">Sort: Strike</option>
+              <option value="change">Sort: Volatility</option>
+              <option value="volume">Sort: Volume</option>
+            </select>
+          </div>
+
+          <div class="option-quantity-row">
+            <span class="qty-label">Quick Qty</span>
+            <div class="qty-stepper">
+              <button type="button" (click)="incrementOptionQuantity(-1)">-</button>
+              <span>{{ optionQuickQuantity }}</span>
+              <button type="button" (click)="incrementOptionQuantity(1)">+</button>
+            </div>
+          </div>
+
+          <div class="options-spot-row" *ngIf="selectedOptionUnderlying">
+            <span class="spot-label">Spot</span>
+            <span class="spot-value">{{ selectedOptionUnderlying }} ${{ getMarketPrice(selectedOptionUnderlying) | number:'1.2-2' }}</span>
+          </div>
+
+          <div class="options-heatmap" *ngIf="optionHeatmapRows.length > 0">
+            <div class="heatmap-header">
+              <span class="heatmap-title">Chain Heatmap</span>
+              <span class="heatmap-subtitle">Signal from move pressure and flow</span>
+            </div>
+            <div class="heatmap-grid">
+              <div class="heatmap-row heatmap-label-row">
+                <div class="heatmap-strike-cell">Strike</div>
+                <div class="heatmap-expiry-cell" *ngFor="let expiry of optionHeatmapExpiries">{{ formatOptionExpiry(expiry) }}</div>
+              </div>
+              <div class="heatmap-row" *ngFor="let row of optionHeatmapRows">
+                <div class="heatmap-strike-cell">${{ row.strike | number:'1.0-0' }}</div>
+                <div
+                  class="heatmap-data-cell"
+                  *ngFor="let cell of row.cells"
+                  [style.background]="getOptionHeatmapCellStyle(cell)">
+                  <span>{{ cell.absMove | number:'1.2-2' }}%</span>
+                  <small>V {{ cell.volume }}</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="options-chain-list" *ngIf="optionChainRows.length > 0; else noOptionsForFilter">
+            <div
+              class="options-chain-row"
+              *ngFor="let row of optionChainRows"
+              [class.selected]="selectedOptionStrike === row.strike">
+
+              <div class="option-leg call" [class.itm]="isOptionStrikeInTheMoney(row.strike, 'CALL')">
+                <button type="button" class="leg-select" (click)="selectOptionSymbol(row.callSymbol)">{{ getOptionContractLabel(row.callSymbol) }}</button>
+                <div class="leg-price" *ngIf="row.callQuote; else noCallQuote">
+                  ${{ row.callQuote.lastPrice | number:'1.2-2' }}
+                  <span class="leg-change" [class.positive]="row.callQuote.changePercent >= 0" [class.negative]="row.callQuote.changePercent < 0">
+                    {{ row.callQuote.changePercent >= 0 ? '+' : '' }}{{ row.callQuote.changePercent | number:'1.2-2' }}%
+                  </span>
+                </div>
+                <div class="leg-micro" *ngIf="row.callQuote">
+                  <span>Mid ${{ getOptionMid(row.callQuote) | number:'1.2-2' }}</span>
+                  <span>Spr ${{ getOptionSpreadFromQuote(row.callQuote) | number:'1.2-2' }}</span>
+                  <span>Δ {{ getOptionDelta(row.callSymbol) | number:'1.2-2' }}</span>
+                  <span>Θ {{ getOptionTheta(row.callSymbol) | number:'1.3-3' }}</span>
+                </div>
+                <ng-template #noCallQuote>
+                  <div class="leg-price muted">No quote</div>
+                </ng-template>
+                <div class="leg-actions">
+                  <button class="btn-leg stage" (click)="stageOptionOrder(row.callSymbol, '1'); $event.stopPropagation()" [disabled]="!row.callSymbol">Stage</button>
+                  <button class="btn-leg buy" (click)="quickBuyOption(row.callSymbol); $event.stopPropagation()" [disabled]="!row.callSymbol">Buy</button>
+                  <button class="btn-leg sell" (click)="quickSellOption(row.callSymbol); $event.stopPropagation()" [disabled]="!row.callSymbol">Sell</button>
+                </div>
+              </div>
+
+              <button type="button" class="strike-cell" (click)="selectOptionStrike(row.strike)">
+                <span class="strike-label">Strike</span>
+                <span class="strike-value">${{ row.strike | number:'1.0-0' }}</span>
+              </button>
+
+              <div class="option-leg put" [class.itm]="isOptionStrikeInTheMoney(row.strike, 'PUT')">
+                <button type="button" class="leg-select" (click)="selectOptionSymbol(row.putSymbol)">{{ getOptionContractLabel(row.putSymbol) }}</button>
+                <div class="leg-price" *ngIf="row.putQuote; else noPutQuote">
+                  ${{ row.putQuote.lastPrice | number:'1.2-2' }}
+                  <span class="leg-change" [class.positive]="row.putQuote.changePercent >= 0" [class.negative]="row.putQuote.changePercent < 0">
+                    {{ row.putQuote.changePercent >= 0 ? '+' : '' }}{{ row.putQuote.changePercent | number:'1.2-2' }}%
+                  </span>
+                </div>
+                <div class="leg-micro" *ngIf="row.putQuote">
+                  <span>Mid ${{ getOptionMid(row.putQuote) | number:'1.2-2' }}</span>
+                  <span>Spr ${{ getOptionSpreadFromQuote(row.putQuote) | number:'1.2-2' }}</span>
+                  <span>Δ {{ getOptionDelta(row.putSymbol) | number:'1.2-2' }}</span>
+                  <span>Θ {{ getOptionTheta(row.putSymbol) | number:'1.3-3' }}</span>
+                </div>
+                <ng-template #noPutQuote>
+                  <div class="leg-price muted">No quote</div>
+                </ng-template>
+                <div class="leg-actions">
+                  <button class="btn-leg stage" (click)="stageOptionOrder(row.putSymbol, '2'); $event.stopPropagation()" [disabled]="!row.putSymbol">Stage</button>
+                  <button class="btn-leg buy" (click)="quickBuyOption(row.putSymbol); $event.stopPropagation()" [disabled]="!row.putSymbol">Buy</button>
+                  <button class="btn-leg sell" (click)="quickSellOption(row.putSymbol); $event.stopPropagation()" [disabled]="!row.putSymbol">Sell</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <ng-template #noOptionsForFilter>
+            <div class="options-empty">No option contracts available for current filters.</div>
+          </ng-template>
         </section>
 
         <!-- Positions -->
@@ -418,7 +580,7 @@
 
   <!-- Watchlist Slide Panel -->
   <div class="slide-panel" [class.open]="showWatchlistPanel">
-    <div class="panel-backdrop" (click)="showWatchlistPanel = false"></div>
+    <button type="button" class="panel-backdrop" aria-label="Close watchlist panel" (click)="showWatchlistPanel = false"></button>
     <div class="panel-content">
       <div class="panel-header">
         <h3>
@@ -473,7 +635,7 @@
 
   <!-- Alerts Slide Panel -->
   <div class="slide-panel" [class.open]="showAlertsPanel">
-    <div class="panel-backdrop" (click)="showAlertsPanel = false"></div>
+    <button type="button" class="panel-backdrop" aria-label="Close alerts panel" (click)="showAlertsPanel = false"></button>
     <div class="panel-content">
       <div class="panel-header">
         <h3>
