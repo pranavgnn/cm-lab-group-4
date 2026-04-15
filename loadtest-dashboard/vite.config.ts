@@ -37,8 +37,7 @@ function runTestApiPlugin() {
           return
         }
 
-        const projectRoot = path.resolve(__dirname, '..')
-        const scriptPath = path.resolve(projectRoot, 'tests/fix_async_load_test.py')
+        const scriptPath = path.resolve(__dirname, 'scripts/fix_async_load_test.py')
         const outputFile = path.resolve(__dirname, 'public/loadtest-results.json')
         const pythonExecutable = getPythonExecutable()
 

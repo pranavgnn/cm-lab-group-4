@@ -7,15 +7,10 @@ RUN pip3 install simplefix --break-system-packages
 
 WORKDIR $APP_HOME
 
-COPY loadtest-dashboard/package*.json ./loadtest-dashboard/
-WORKDIR $APP_HOME/loadtest-dashboard
+COPY package*.json ./
 RUN npm ci
 
-WORKDIR $APP_HOME
-COPY loadtest-dashboard/ ./loadtest-dashboard/
-COPY tests/ ./tests/
-
-WORKDIR $APP_HOME/loadtest-dashboard
+COPY . .
 
 RUN sed -i "s/'--users'/'--host', 'exchange-back-end', '--port', '9876', '--users'/g" vite.config.ts
 

@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "run:test-data": "python ../tests/fix_async_load_test.py --output-file ./public/loadtest-results.json"
+    "run:test-data": "python ./scripts/fix_async_load_test.py --output-file ./public/loadtest-results.json"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
