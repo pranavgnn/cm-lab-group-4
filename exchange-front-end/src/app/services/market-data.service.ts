@@ -85,8 +85,7 @@ export class MarketDataService {
   private connectWebSocket(): void {
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.hostname;
-      this.wsConnection = new WebSocket(`${protocol}//${host}:8090/ws/aggregator`);
+      this.wsConnection = new WebSocket(`${protocol}//${window.location.host}/ws/aggregator`);
 
       this.wsConnection.onmessage = (event) => {
         try {

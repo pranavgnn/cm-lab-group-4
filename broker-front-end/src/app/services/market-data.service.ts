@@ -44,8 +44,7 @@ export class MarketDataService {
   }
 
   private loadSecurities(): void {
-    // Broker frontend fetches from exchange backend via CORS or directly
-    this.http.get<Security[]>('http://localhost:8090/api/securities').pipe(
+    this.http.get<Security[]>('/api/securities').pipe(
       catchError(() => of([]))
     ).subscribe({
       next: (securities) => this.securitiesSubject.next(securities),
@@ -56,7 +55,7 @@ export class MarketDataService {
   private startPolling(): void {
     interval(3000).pipe(
       startWith(0),
-      switchMap(() => this.http.get<MarketData[]>('http://localhost:8090/api/marketdata').pipe(
+      switchMap(() => this.http.get<MarketData[]>('/api/marketdata').pipe(
         catchError(() => of([]))
       ))
     ).subscribe({
@@ -69,11 +68,11 @@ export class MarketDataService {
   }
 
   getSecurities(): Observable<Security[]> {
-    return this.http.get<Security[]>('http://localhost:8090/api/securities');
+    return this.http.get<Security[]>('/api/securities');
   }
 
   getMarketData(): Observable<MarketData[]> {
-    return this.http.get<MarketData[]>('http://localhost:8090/api/marketdata');
+    return this.http.get<MarketData[]>('/api/marketdata');
   }
 
   getQuote(symbol: string): MarketData | undefined {

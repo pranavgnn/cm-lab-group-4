@@ -16,6 +16,7 @@ RUN npm run build
 FROM nginx:alpine
 
 COPY --from=0 /opt/app/dist/exchange-front-end /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

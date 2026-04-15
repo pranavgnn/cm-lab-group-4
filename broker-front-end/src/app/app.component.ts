@@ -102,7 +102,7 @@ export class AppComponent implements OnInit, OnDestroy {
   sessionInfo: SessionInfo | null = null;
   loading = false;
   error: string | null = null;
-  
+
   // Authentication
   currentUser: User | null = null;
   showLoginForm = false;
@@ -114,15 +114,15 @@ export class AppComponent implements OnInit, OnDestroy {
     displayName: ''
   };
   authError: string | null = null;
-  
+
   // Market data from exchange
   marketData: MarketData[] = [];
-  
+
   // Position tracking
   positions: Position[] = [];
   totalPortfolioValue = 0;
   totalUnrealizedPnL = 0;
-  
+
   // Extended stock symbols - Tech, Finance, Healthcare, Energy, Consumer
   quickSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'AMD'];
   allSymbols = [
@@ -158,13 +158,13 @@ export class AppComponent implements OnInit, OnDestroy {
     { label: 'ATM +/- 2', value: 2 },
     { label: 'ATM +/- 3', value: 3 }
   ];
-  
+
   // Live news articles
   newsArticles: NewsArticle[] = [];
-  
+
   // Sector Performance
   sectorPerformance: SectorPerformance[] = [];
-  
+
   // Market indices
   marketIndices = [
     { symbol: 'SPY', name: 'S&P 500', price: 4785.50, change: 0.85 },
@@ -172,11 +172,11 @@ export class AppComponent implements OnInit, OnDestroy {
     { symbol: 'DIA', name: 'DOW', price: 38450.80, change: 0.42 },
     { symbol: 'IWM', name: 'Russell 2K', price: 2015.75, change: -0.32 }
   ];
-  
+
   // Top movers
-  topGainers: {symbol: string, change: number, price: number}[] = [];
-  topLosers: {symbol: string, change: number, price: number}[] = [];
-  
+  topGainers: { symbol: string, change: number, price: number }[] = [];
+  topLosers: { symbol: string, change: number, price: number }[] = [];
+
   // New order form
   newOrder = {
     symbol: 'AAPL',
@@ -186,14 +186,14 @@ export class AppComponent implements OnInit, OnDestroy {
     orderType: 'LIMIT',
     timeInForce: 'DAY'
   };
-  
+
   // Toast notifications
   toasts: Toast[] = [];
-  
+
   // Watchlist
   watchlist: string[] = [];
   showWatchlistPanel = false;
-  
+
   // Price Alerts
   priceAlerts: PriceAlert[] = [];
   showAlertsPanel = false;
@@ -215,37 +215,37 @@ export class AppComponent implements OnInit, OnDestroy {
     'CANCELED',
     'REJECTED'
   ];
-  
+
   private pollingSubscription?: Subscription;
   private marketDataSubscription?: Subscription;
   private toastSubscription?: Subscription;
   private watchlistSubscription?: Subscription;
   private alertsSubscription?: Subscription;
-  
+
   constructor(
-    private orderService: OrderService, 
+    private orderService: OrderService,
     private http: HttpClient,
     private authService: AuthService,
     public notificationService: NotificationService,
     public watchlistService: WatchlistService
-  ) {}
-  
+  ) { }
+
   ngOnInit(): void {
     // Subscribe to toast notifications
     this.toastSubscription = this.notificationService.toasts$.subscribe(toasts => {
       this.toasts = toasts;
     });
-    
+
     // Subscribe to watchlist
     this.watchlistSubscription = this.watchlistService.watchlist$.subscribe(watchlist => {
       this.watchlist = watchlist;
     });
-    
+
     // Subscribe to price alerts
     this.alertsSubscription = this.watchlistService.alerts$.subscribe(alerts => {
       this.priceAlerts = alerts;
     });
-    
+
     // Set default user (no login required)
     this.currentUser = {
       id: 1,
@@ -256,7 +256,7 @@ export class AppComponent implements OnInit, OnDestroy {
       balance: 100000,
       isAdmin: true
     };
-    
+
     // Load everything immediately
     this.loadOrders();
     this.loadSessionInfo();
@@ -266,7 +266,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.loadSectorPerformance();
     this.startPolling();
     this.startMarketDataPolling();
-    
+
     // Update time and market data every second
     setInterval(() => {
       this.currentTime = new Date();
@@ -274,7 +274,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.updateTopMovers();
     }, 1000);
   }
-  
+
   ngOnDestroy(): void {
     if (this.pollingSubscription) {
       this.pollingSubscription.unsubscribe();
@@ -292,7 +292,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.alertsSubscription.unsubscribe();
     }
   }
-  
+
   // Authentication methods
   showLogin(): void {
     this.showLoginForm = true;
@@ -300,20 +300,20 @@ export class AppComponent implements OnInit, OnDestroy {
     this.authError = null;
     this.resetLoginForm();
   }
-  
+
   showRegister(): void {
     this.showLoginForm = true;
     this.isRegistering = true;
     this.authError = null;
     this.resetLoginForm();
   }
-  
+
   cancelLogin(): void {
     this.showLoginForm = false;
     this.authError = null;
     this.resetLoginForm();
   }
-  
+
   resetLoginForm(): void {
     this.loginForm = {
       username: '',
@@ -322,10 +322,10 @@ export class AppComponent implements OnInit, OnDestroy {
       displayName: ''
     };
   }
-  
+
   submitLogin(): void {
     this.authError = null;
-    
+
     if (this.isRegistering) {
       const request: RegisterRequest = {
         username: this.loginForm.username,
@@ -333,7 +333,7 @@ export class AppComponent implements OnInit, OnDestroy {
         email: this.loginForm.email,
         displayName: this.loginForm.displayName || this.loginForm.username
       };
-      
+
       this.authService.register(request).pipe(
         catchError(err => {
           this.authError = err.error?.error || 'Registration failed';
@@ -350,7 +350,7 @@ export class AppComponent implements OnInit, OnDestroy {
         username: this.loginForm.username,
         password: this.loginForm.password
       };
-      
+
       this.authService.login(request).pipe(
         catchError(err => {
           this.authError = err.error?.error || 'Invalid username or password';
@@ -364,7 +364,7 @@ export class AppComponent implements OnInit, OnDestroy {
       });
     }
   }
-  
+
   userLogout(): void {
     this.authService.logout();
     this.orders = [];
@@ -375,10 +375,10 @@ export class AppComponent implements OnInit, OnDestroy {
       this.pollingSubscription.unsubscribe();
     }
   }
-  
+
   loadMarketData(): void {
     // Load market data from exchange backend
-    this.http.get<MarketData[]>('http://localhost:8090/api/marketdata').pipe(
+    this.http.get<MarketData[]>('/api/marketdata').pipe(
       catchError(() => of([]))
     ).subscribe(data => {
       this.marketData = data;
@@ -389,7 +389,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   loadTradableSymbols(): void {
-    this.http.get<SecurityInfo[]>('http://localhost:8090/api/securities').pipe(
+    this.http.get<SecurityInfo[]>('/api/securities').pipe(
       catchError(() => of([]))
     ).subscribe(securities => {
       if (!securities.length) {
@@ -413,10 +413,10 @@ export class AppComponent implements OnInit, OnDestroy {
       this.buildOptionChainRows();
     });
   }
-  
+
   startMarketDataPolling(): void {
     this.marketDataSubscription = interval(5000).pipe(
-      switchMap(() => this.http.get<MarketData[]>('http://localhost:8090/api/marketdata').pipe(
+      switchMap(() => this.http.get<MarketData[]>('/api/marketdata').pipe(
         catchError(() => of([]))
       ))
     ).subscribe(data => {
@@ -428,7 +428,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.watchlistService.checkAlerts(this.marketData);
     });
   }
-  
+
   loadOrders(): void {
     this.loading = true;
     this.error = null;
@@ -443,7 +443,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.calculatePositions();
     });
   }
-  
+
   loadSessionInfo(): void {
     this.orderService.getSessionInfo().pipe(
       catchError(err => {
@@ -454,7 +454,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.sessionInfo = info;
     });
   }
-  
+
   startPolling(): void {
     this.pollingSubscription = interval(5000).pipe(
       switchMap(() => this.orderService.getOrders().pipe(
@@ -465,7 +465,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.calculatePositions();
     });
   }
-  
+
   submitOrder(): void {
     this.error = null;
     const order: any = {
@@ -477,7 +477,7 @@ export class AppComponent implements OnInit, OnDestroy {
       orderType: this.newOrder.orderType,
       status: 'NEW'
     };
-    
+
     this.orderService.createOrder(order).pipe(
       catchError(err => {
         this.error = 'Failed to submit order: ' + (err.message || 'Unknown error');
@@ -489,7 +489,7 @@ export class AppComponent implements OnInit, OnDestroy {
       }
     });
   }
-  
+
   cancelOrder(clOrdId: string): void {
     this.orderService.cancelOrder(clOrdId).pipe(
       catchError(err => {
@@ -500,7 +500,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.loadOrders();
     });
   }
-  
+
   logon(): void {
     this.orderService.logon().pipe(
       catchError(err => {
@@ -511,7 +511,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.loadSessionInfo();
     });
   }
-  
+
   logout(): void {
     this.orderService.logout().pipe(
       catchError(err => {
@@ -522,7 +522,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.loadSessionInfo();
     });
   }
-  
+
   getStatusClass(status: string): string {
     switch (status?.toUpperCase()) {
       case 'NEW': return 'status-new';
@@ -533,40 +533,40 @@ export class AppComponent implements OnInit, OnDestroy {
       default: return 'status-unknown';
     }
   }
-  
+
   getSideLabel(side: string): string {
     return side === '1' ? 'BUY' : side === '2' ? 'SELL' : side;
   }
-  
+
   getSideClass(side: string): string {
     return side === '1' ? 'side-buy' : side === '2' ? 'side-sell' : '';
   }
-  
+
   refreshOrders(): void {
     this.loadOrders();
     this.loadSessionInfo();
   }
-  
+
   calculatePositions(): void {
     const positionMap = new Map<string, { qty: number; totalCost: number }>();
-    
+
     // Process filled orders
-    const filledOrders = this.orders.filter(o => 
+    const filledOrders = this.orders.filter(o =>
       o.status?.toUpperCase() === 'FILLED' || o.status?.toUpperCase() === 'PARTIALLY_FILLED'
     );
-    
+
     filledOrders.forEach(order => {
       const symbol = order.symbol;
       const qty = order.filledQty || order.quantity;
       const price = order.price;
       const isBuy = order.side === '1';
-      
+
       if (!positionMap.has(symbol)) {
         positionMap.set(symbol, { qty: 0, totalCost: 0 });
       }
-      
+
       const pos = positionMap.get(symbol)!;
-      
+
       if (isBuy) {
         pos.qty += qty;
         pos.totalCost += qty * price;
@@ -577,12 +577,12 @@ export class AppComponent implements OnInit, OnDestroy {
         pos.qty -= sellQty;
       }
     });
-    
+
     // Convert to Position array
     this.positions = [];
     this.totalPortfolioValue = 0;
     this.totalUnrealizedPnL = 0;
-    
+
     positionMap.forEach((pos, symbol) => {
       if (pos.qty > 0) {
         const md = this.marketData.find(m => m.symbol === symbol);
@@ -591,7 +591,7 @@ export class AppComponent implements OnInit, OnDestroy {
         const marketValue = pos.qty * currentPrice;
         const unrealizedPnL = (currentPrice - avgPrice) * pos.qty;
         const unrealizedPnLPercent = avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice) * 100 : 0;
-        
+
         this.positions.push({
           symbol,
           quantity: pos.qty,
@@ -601,19 +601,19 @@ export class AppComponent implements OnInit, OnDestroy {
           unrealizedPnL,
           unrealizedPnLPercent
         });
-        
+
         this.totalPortfolioValue += marketValue;
         this.totalUnrealizedPnL += unrealizedPnL;
       }
     });
-    
+
     this.positions.sort((a, b) => b.marketValue - a.marketValue);
   }
-  
+
   getFilledCount(): number {
     return this.orders.filter(o => o.status?.toUpperCase() === 'FILLED').length;
   }
-  
+
   getOpenCount(): number {
     return this.orders.filter(o => ['NEW', 'PARTIALLY_FILLED'].includes(o.status?.toUpperCase() || '')).length;
   }
@@ -648,12 +648,12 @@ export class AppComponent implements OnInit, OnDestroy {
     this.orderSearchQuery = '';
     this.orderStatusFilter = 'ALL';
   }
-  
+
   // Toast notification methods
   dismissToast(id: number): void {
     this.notificationService.dismiss(id);
   }
-  
+
   // Watchlist methods
   toggleWatchlistPanel(): void {
     this.showWatchlistPanel = !this.showWatchlistPanel;
@@ -661,19 +661,19 @@ export class AppComponent implements OnInit, OnDestroy {
       this.showAlertsPanel = false;
     }
   }
-  
+
   toggleWatchlist(symbol: string): void {
     this.watchlistService.toggleWatchlist(symbol);
   }
-  
+
   isInWatchlist(symbol: string): boolean {
     return this.watchlistService.isInWatchlist(symbol);
   }
-  
+
   getWatchlistData(): MarketData[] {
     return this.marketData.filter(m => this.watchlist.includes(m.symbol));
   }
-  
+
   // Price Alert methods
   toggleAlertsPanel(): void {
     this.showAlertsPanel = !this.showAlertsPanel;
@@ -681,7 +681,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.showWatchlistPanel = false;
     }
   }
-  
+
   addPriceAlert(): void {
     this.watchlistService.addAlert(
       this.newAlert.symbol,
@@ -689,30 +689,30 @@ export class AppComponent implements OnInit, OnDestroy {
       this.newAlert.condition
     );
   }
-  
+
   removeAlert(id: number): void {
     this.watchlistService.removeAlert(id);
   }
-  
+
   clearTriggeredAlerts(): void {
     this.watchlistService.clearTriggeredAlerts();
   }
-  
+
   getActiveAlerts(): PriceAlert[] {
     return this.watchlistService.getActiveAlerts();
   }
-  
+
   getTriggeredAlerts(): PriceAlert[] {
     return this.watchlistService.getTriggeredAlerts();
   }
-  
+
   // CSV Export
   exportTradesToCSV(): void {
     if (this.orders.length === 0) {
       this.notificationService.warning('Export', 'No trades to export');
       return;
     }
-    
+
     const headers = ['Order ID', 'Symbol', 'Side', 'Quantity', 'Price', 'Status', 'Filled Qty', 'Created At'];
     const rows = this.orders.map(order => [
       order.clOrdId,
@@ -724,33 +724,33 @@ export class AppComponent implements OnInit, OnDestroy {
       (order.filledQty || 0).toString(),
       order.createdAt ? new Date(order.createdAt).toISOString() : ''
     ]);
-    
+
     const csvContent = [
       headers.join(','),
       ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
     ].join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
-    
+
     link.setAttribute('href', url);
     link.setAttribute('download', `trades_${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     this.notificationService.success('Export', `Exported ${this.orders.length} trades to CSV`);
   }
-  
+
   // Keyboard shortcuts
   // Analytics and new features
   depthSymbol = 'AAPL';
   showHotkeysPanel = false;
   currentTime = new Date();
   sparklineData: Map<string, number[]> = new Map();
-  
+
   @HostListener('document:keydown', ['$event'])
   handleKeyboardShortcut(event: KeyboardEvent): void {
     // Don't trigger shortcuts when typing in inputs
@@ -765,7 +765,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.handleOptionShortcuts(event)) {
       return;
     }
-    
+
     // Escape = Close panels
     if (event.key === 'Escape') {
       this.showWatchlistPanel = false;
@@ -859,7 +859,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     return null;
   }
-  
+
   // Performance Analytics Methods
   getWinRate(): number {
     const filled = this.orders.filter(o => o.status === 'FILLED');
@@ -867,24 +867,24 @@ export class AppComponent implements OnInit, OnDestroy {
     // Simulated win rate based on filled orders
     return Math.min(100, 50 + (filled.length * 5));
   }
-  
+
   getTotalTrades(): number {
     return this.orders.filter(o => o.status === 'FILLED').length;
   }
-  
+
   getAvgProfit(): number {
     const filled = this.orders.filter(o => o.status === 'FILLED');
     if (filled.length === 0) return 0;
     // Simulated avg profit
     return filled.reduce((sum, o) => sum + (o.quantity * 0.5), 0) / filled.length;
   }
-  
+
   getBestTrade(): number {
     const filled = this.orders.filter(o => o.status === 'FILLED');
     if (filled.length === 0) return 0;
     return Math.max(...filled.map(o => o.quantity * 1.2));
   }
-  
+
   // Sparkline chart points
   getSparklinePoints(symbol: string): string {
     if (!this.sparklineData.has(symbol)) {
@@ -901,7 +901,7 @@ export class AppComponent implements OnInit, OnDestroy {
     const data = this.sparklineData.get(symbol) || [];
     return data.map((v, i) => `${i * 5},${30 - (v / 100) * 30}`).join(' ');
   }
-  
+
   // Quick Trade Methods
   quickBuy(symbol: string, qty: number): void {
     const price = this.getExecutablePrice(symbol, '1');
@@ -926,7 +926,7 @@ export class AppComponent implements OnInit, OnDestroy {
       }
     });
   }
-  
+
   quickSell(symbol: string, qty: number): void {
     const price = this.getExecutablePrice(symbol, '2');
     const order: any = {
@@ -950,28 +950,28 @@ export class AppComponent implements OnInit, OnDestroy {
       }
     });
   }
-  
+
   // Risk Management Methods
   getExposurePercent(): number {
     const maxExposure = this.currentUser?.balance || 100000;
     return Math.min(100, (this.totalPortfolioValue / maxExposure) * 100);
   }
-  
+
   getDailyPnL(): number {
     return this.totalUnrealizedPnL;
   }
-  
+
   getDailyPnLPercent(): number {
     const limit = 5000;
     return Math.min(100, (Math.abs(this.getDailyPnL()) / limit) * 100);
   }
-  
+
   // Order Book Depth Methods
   onDepthSymbolChange(): void {
     this.newOrder.symbol = this.depthSymbol;
   }
-  
-  getBids(): {price: number, qty: number, percent: number}[] {
+
+  getBids(): { price: number, qty: number, percent: number }[] {
     const stock = this.marketData.find(s => s.symbol === this.depthSymbol);
     const basePrice = stock ? stock.bid : 175;
     return [
@@ -982,8 +982,8 @@ export class AppComponent implements OnInit, OnDestroy {
       { price: basePrice - 0.20, qty: 150, percent: 30 },
     ];
   }
-  
-  getAsks(): {price: number, qty: number, percent: number}[] {
+
+  getAsks(): { price: number, qty: number, percent: number }[] {
     const stock = this.marketData.find(s => s.symbol === this.depthSymbol);
     const basePrice = stock ? stock.ask : 175.50;
     return [
@@ -994,7 +994,7 @@ export class AppComponent implements OnInit, OnDestroy {
       { price: basePrice + 0.20, qty: 380, percent: 76 },
     ];
   }
-  
+
   getSpread(): number {
     const stock = this.marketData.find(s => s.symbol === this.depthSymbol);
     return stock ? (stock.ask - stock.bid) : 0.05;
@@ -1526,7 +1526,7 @@ export class AppComponent implements OnInit, OnDestroy {
   // News and Market Data Methods
   loadNewsArticles(): void {
     const sources = ['Reuters', 'Bloomberg', 'CNBC', 'MarketWatch', 'WSJ', 'Financial Times'];
-    
+
     const headlines = [
       { title: 'Tech Stocks Rally as AI Demand Surges', symbols: ['NVDA', 'GOOGL', 'MSFT'], sentiment: 'bullish' as const },
       { title: 'Fed Signals Potential Rate Cut in Q2', symbols: ['SPY', 'JPM', 'BAC'], sentiment: 'bullish' as const },
@@ -1570,7 +1570,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   updateTopMovers(): void {
     if (this.marketData.length === 0) return;
-    
+
     const sorted = [...this.marketData].sort((a, b) => b.changePercent - a.changePercent);
     this.topGainers = sorted.slice(0, 5).map(s => ({
       symbol: s.symbol,
@@ -1615,7 +1615,7 @@ export class AppComponent implements OnInit, OnDestroy {
       orderType: formData.orderType,
       status: 'NEW'
     };
-    
+
     this.orderService.createOrder(order).pipe(
       catchError(err => {
         this.notificationService.error('Order Failed', err.message || 'Failed to submit order');

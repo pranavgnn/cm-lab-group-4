@@ -54,11 +54,27 @@ export class OrderService {
   private initWebSocket(): void {
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const ws = new WebSocket(`${protocol}//${window.location.host}/socket/order`);
+      const ws = new WebSocket(`${protocol}//${window.location.host}/ws/aggregator`);
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ action: 'SUBSCRIBE', channel: 'ORDERS' }));
+      };
 
       ws.onmessage = (event) => {
-        const order = JSON.parse(event.data);
-        this.orderUpdates.next(order);
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'ORDER_UPDATE' && msg.data) {
+            this.orderUpdates.next(msg.data);
+          } else if (msg.type === 'BATCH' && msg.data && msg.data.messages) {
+            msg.data.messages.forEach((m: any) => {
+              if (m.type === 'ORDER_UPDATE' && m.data) {
+                this.orderUpdates.next(m.data);
+              }
+            });
+          }
+        } catch (e) {
+          console.error('Error parsing WS message', e);
+        }
       };
 
       ws.onerror = (error) => {

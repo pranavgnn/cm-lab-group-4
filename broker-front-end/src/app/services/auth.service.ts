@@ -25,7 +25,7 @@ export interface RegisterRequest {
   displayName?: string;
 }
 
-const BASE_URL = 'http://localhost:8080/api/auth';
+const BASE_URL = '/api/auth';
 
 @Injectable({
   providedIn: 'root'

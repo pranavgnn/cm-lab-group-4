@@ -699,13 +699,12 @@ export class AppComponent implements OnInit, OnDestroy {
       quantity: this.newOrder.quantity,
       price: this.newOrder.price,
       orderType: this.newOrder.orderType,
-      timeInForce: this.newOrder.timeInForce,
-      status: 'NEW'
+      timeInForce: this.newOrder.timeInForce
     };
     
     this.orderService.createOrder(order).pipe(
       catchError(err => {
-        this.error = 'Failed to submit order: ' + (err.message || err.statusText || 'Unknown error');
+        this.error = 'Failed to submit order: ' + (err.error?.rejectReason || err.error?.error || err.message || err.statusText || 'Unknown error');
         return of(null);
       })
     ).subscribe(result => {
@@ -874,7 +873,7 @@ export class AppComponent implements OnInit, OnDestroy {
     const midPrice = stock?.price || 175;
     
     // Try to fetch real order book from API
-    this.http.get<any>(`/api/marketdata/orderbook/${symbol}?depth=10`)
+    this.http.get<any>(`/api/orderbook/${symbol}?depth=10`)
       .pipe(catchError(() => of(null)))
       .subscribe(response => {
         if (response && response.bids && response.bids.length > 0) {
@@ -968,7 +967,7 @@ export class AppComponent implements OnInit, OnDestroy {
   
   loadRecentTrades(): void {
     const symbol = this.selectedOrderBookSymbol;
-    this.http.get<any[]>(`/api/marketdata/trades/${symbol}`)
+    this.http.get<any[]>(`/api/trades/${symbol}`)
       .pipe(catchError(() => of([])))
       .subscribe(trades => {
         this.recentTrades = (trades || []).slice(0, 20).map(t => ({

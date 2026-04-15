@@ -35,6 +35,7 @@ services:
     restart: unless-stopped
     ports:
       - "8090:8090"
+      - "9876:9876"
     depends_on:
       postgres:
         condition: service_healthy
