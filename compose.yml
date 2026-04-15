@@ -119,6 +119,22 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  loadtest-dashboard:
+    build:
+      context: .
+      dockerfile: ./loadtest-dashboard/Dockerfile
+    container_name: loadtest-dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - qfj-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   postgres:
 

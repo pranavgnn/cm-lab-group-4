@@ -1,22 +1,24 @@
 FROM node:20-alpine
 
 ENV APP_HOME=/opt/app
-RUN mkdir -p $APP_HOME
+
+RUN apk add --no-cache python3 py3-pip
+RUN pip3 install simplefix --break-system-packages
 
 WORKDIR $APP_HOME
 
-COPY package*.json ./
-
+COPY loadtest-dashboard/package*.json ./loadtest-dashboard/
+WORKDIR $APP_HOME/loadtest-dashboard
 RUN npm ci
 
-COPY . . 
+WORKDIR $APP_HOME
+COPY loadtest-dashboard/ ./loadtest-dashboard/
+COPY tests/ ./tests/
 
-RUN npm run build
+WORKDIR $APP_HOME/loadtest-dashboard
 
-FROM nginx:alpine
+RUN sed -i "s/'--users'/'--host', 'exchange-back-end', '--port', '9876', '--users'/g" vite.config.ts
 
-COPY --from=0 /opt/app/dist /usr/share/nginx/html
+EXPOSE 3000
 
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
