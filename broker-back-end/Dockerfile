@@ -1,3 +1,14 @@
+FROM maven:3.9.9-eclipse-temurin-11 AS build
+
+WORKDIR /workspace
+
+COPY pom.xml .
+COPY src ./src
+
+RUN mkdir -p src/main/resources && touch src/main/resources/import.sql \
+    && mvn -B -DskipTests -Dquarkus.package.type=uber-jar package \
+    && cp target/*-runner.jar target/app.jar
+
 FROM eclipse-temurin:11-jre-jammy
 
 ENV APP_HOME=/opt/app
@@ -8,7 +19,7 @@ RUN apt-get update \
 
 WORKDIR $APP_HOME
 
-COPY target/app.jar app.jar
+COPY --from=build /workspace/target/app.jar app.jar
 
 EXPOSE 8080
 

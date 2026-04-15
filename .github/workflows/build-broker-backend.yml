@@ -24,25 +24,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java 11
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "11"
-          cache: maven
-
-      - name: Ensure import.sql exists
-        working-directory: ./broker-back-end
-        run: touch src/main/resources/import.sql
-
-      - name: Build broker-back-end jar
-        working-directory: ./broker-back-end
-        run: mvn -B -DskipTests -Dquarkus.package.type=uber-jar package
-
-      - name: Normalize broker-back-end jar path
-        working-directory: ./broker-back-end
-        run: cp target/*-runner.jar target/app.jar
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
