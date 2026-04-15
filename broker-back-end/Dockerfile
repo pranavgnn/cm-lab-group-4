@@ -6,7 +6,7 @@ COPY pom.xml .
 COPY src ./src
 
 RUN mkdir -p src/main/resources && touch src/main/resources/import.sql \
-    && mvn -B -DskipTests -Dquarkus.package.type=uber-jar package \
+	&& mvn -B -DskipTests -Dquarkus.package.type=uber-jar -Dquarkus.datasource.db-kind=postgresql package \
     && cp target/*-runner.jar target/app.jar
 
 FROM eclipse-temurin:11-jre-jammy
