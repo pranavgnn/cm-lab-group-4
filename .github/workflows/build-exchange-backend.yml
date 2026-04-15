@@ -31,6 +31,10 @@ jobs:
           java-version: "11"
           cache: maven
 
+      - name: Ensure import.sql exists
+        working-directory: ./exchange-back-end
+        run: touch src/main/resources/import.sql
+
       - name: Build exchange-back-end jar
         working-directory: ./exchange-back-end
         run: mvn -B -DskipTests package

@@ -31,6 +31,10 @@ jobs:
           java-version: "11"
           cache: maven
 
+      - name: Ensure import.sql exists
+        working-directory: ./broker-back-end
+        run: touch src/main/resources/import.sql
+
       - name: Build broker-back-end jar
         working-directory: ./broker-back-end
         run: mvn -B -DskipTests package
