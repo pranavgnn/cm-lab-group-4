@@ -37,7 +37,11 @@ jobs:
 
       - name: Build exchange-back-end jar
         working-directory: ./exchange-back-end
-        run: mvn -B -DskipTests package
+        run: mvn -B -DskipTests -Dquarkus.package.type=uber-jar package
+
+      - name: Normalize exchange-back-end jar path
+        working-directory: ./exchange-back-end
+        run: cp target/*-runner.jar target/app.jar
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

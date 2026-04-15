@@ -8,7 +8,7 @@ RUN apt-get update \
 
 WORKDIR $APP_HOME
 
-COPY target/broker-back-end-1.0.0-SNAPSHOT-runner.jar app.jar
+COPY target/app.jar app.jar
 
 EXPOSE 8080
 
