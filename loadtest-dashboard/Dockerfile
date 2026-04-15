@@ -5,11 +5,11 @@ RUN mkdir -p $APP_HOME
 
 WORKDIR $APP_HOME
 
-COPY loadtest-dashboard/package*.json ./
+COPY package*.json ./
 
 RUN npm ci
 
-COPY loadtest-dashboard . 
+COPY . . 
 
 RUN npm run build
 

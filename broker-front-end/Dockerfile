@@ -5,11 +5,11 @@ RUN mkdir -p $APP_HOME
 
 WORKDIR $APP_HOME
 
-COPY broker-front-end/package*.json ./
+COPY package*.json ./
 
 RUN npm ci
 
-COPY broker-front-end . 
+COPY . . 
 
 RUN npm run build
 

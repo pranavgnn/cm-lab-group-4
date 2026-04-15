@@ -1,4 +1,4 @@
-FROM openjdk:11-jre-slim
+FROM eclipse-temurin:11-jre-jammy
 
 ENV APP_HOME=/opt/app
 RUN apt-get update \
@@ -8,7 +8,7 @@ RUN apt-get update \
 
 WORKDIR $APP_HOME
 
-COPY exchange-back-end/target/exchange-back-end-1.0.0-SNAPSHOT-runner.jar app.jar
+COPY target/exchange-back-end-1.0.0-SNAPSHOT-runner.jar app.jar
 
 EXPOSE 8090
 

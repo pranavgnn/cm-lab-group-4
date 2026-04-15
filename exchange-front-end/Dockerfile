@@ -5,11 +5,11 @@ RUN mkdir -p $APP_HOME
 
 WORKDIR $APP_HOME
 
-COPY exchange-front-end/package*.json ./
+COPY package*.json ./
 
 RUN npm ci
 
-COPY exchange-front-end . 
+COPY . . 
 
 RUN npm run build
 
