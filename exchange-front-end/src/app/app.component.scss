@@ -1,4 +1,4 @@
-﻿// Professional Dark Exchange Theme - GitHub Inspired
+// Professional Dark Exchange Theme - GitHub Inspired
 $bg-primary: #0d1117;
 $bg-secondary: #161b22;
 $bg-tertiary: #21262d;
@@ -3246,3 +3246,182 @@ $header-height: 52px;
     }
   }
 }
+
+// ============================================
+// OPTIONS BOARD
+// ============================================
+.options-board-card {
+  background: $bg-secondary;
+  border: 1px solid $border-default;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  .card-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid $border-muted;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: $text-secondary;
+      svg { color: $accent-purple; }
+    }
+  }
+}
+
+.options-controls {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid $border-default;
+  background: $bg-tertiary;
+
+  .search-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: $bg-elevated;
+    border: 1px solid $border-muted;
+    border-radius: 6px;
+    padding: 0 10px;
+    input {
+      background: none; border: none; color: $text-primary; width: 120px;
+      &:focus { outline: none; }
+    }
+    svg { color: $text-muted; }
+  }
+
+  select {
+    height: 28px;
+    border: 1px solid $border-muted;
+    background: $bg-elevated;
+    color: $text-primary;
+    border-radius: 6px;
+    padding: 0 8px;
+    font-size: 11px;
+    &:focus { outline: none; border-color: $info; }
+  }
+}
+
+.options-table-wrapper {
+  overflow-x: auto;
+  position: relative;
+
+  &.compact .options-table th,
+  &.compact .options-table td {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+
+.options-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: right;
+  
+  th, td {
+    padding: 8px 10px;
+    border-bottom: 1px solid $border-muted;
+    font-variant-numeric: tabular-nums;
+  }
+
+  thead {
+    th {
+      font-weight: 600;
+      color: $text-secondary;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .header-group th {
+      border-bottom: none;
+      padding-bottom: 4px;
+      &.calls-header { text-align: left; color: $success; }
+      &.strike-header { text-align: center; color: $text-primary; background: rgba($bg-elevated, 0.5); }
+      &.puts-header { text-align: right; color: $danger; }
+    }
+    .header-sub th {
+      border-bottom: 1px solid $border-default;
+      padding-top: 0;
+    }
+  }
+
+  tbody {
+    .option-row {
+      transition: background 0.15s;
+      &:hover { background: $bg-hover; }
+      &.active { background: rgba($info, 0.1); }
+      
+      .cell-quote {
+        cursor: pointer;
+        font-family: $font-mono;
+        font-weight: 600;
+        &:hover {
+          background: rgba($info, 0.2);
+        }
+        &.itm {
+          background: rgba($warning, 0.05);
+        }
+      }
+
+      .cell-greek {
+        font-family: $font-mono;
+        font-size: 11px;
+        color: $text-muted;
+      }
+
+      .cell-strike {
+        text-align: center;
+        background: rgba($bg-elevated, 0.4);
+        cursor: pointer;
+        font-family: $font-mono;
+        border-left: 1px solid $border-muted;
+        border-right: 1px solid $border-muted;
+
+        .strike-val { font-weight: 700; color: $text-primary; font-size: 13px; }
+        .symbol-sub { font-size: 9px; color: $text-muted; }
+        .spot-price { color: $info; }
+        
+        &:hover { background: rgba($info, 0.15); }
+      }
+    }
+  }
+}
+
+.options-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  padding: 12px;
+  border-top: 1px solid $border-default;
+  background: $bg-tertiary;
+
+  button {
+    background: $bg-elevated;
+    border: 1px solid $border-muted;
+    border-radius: 4px;
+    padding: 4px 12px;
+    color: $text-primary;
+    cursor: pointer;
+    font-size: 12px;
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+    &:not(:disabled):hover { border-color: $info; color: $info; }
+  }
+  .page-info {
+    font-size: 12px;
+    color: $text-secondary;
+  }
+}
+
+.text-success { color: $success; }
+.text-danger { color: $danger; }
+.text-muted { color: $text-muted; }

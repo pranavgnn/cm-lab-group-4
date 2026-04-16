@@ -425,10 +425,116 @@
       
       <!-- Right Column - Market Data & Activity -->
       <div class="right-column">
-        <!-- Trade Blotter -->
-        <app-trade-blotter 
-          [symbol]="selectedOrderBookSymbol">
-        </app-trade-blotter>
+        <!-- Options Pricing Board -->
+        <div class="options-board-card">
+          <div class="card-header">
+            <h3>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3v18h18"/>
+                <path d="M7 15l4-4 3 3 5-6"/>
+              </svg>
+              Options Chain
+            </h3>
+            <div class="card-actions">
+              <button class="btn-icon" (click)="toggleOptionsCompactMode()" title="Toggle Compact Mode">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="3" y1="12" x2="21" y2="12"/>
+                </svg>
+              </button>
+              <button class="btn-icon" (click)="refreshAllOptionsPricing()" title="Refresh Pricing">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <polyline points="1 20 1 14 7 14"/>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="options-controls">
+            <div class="search-group">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="optionsSearchInput" [ngModel]="optionsSearchQuery" (ngModelChange)="onOptionsSearchQueryChange($event)" placeholder="Search symbol...">
+            </div>
+            <select [(ngModel)]="optionsSectorFilter" (change)="onOptionsBoardFiltersChanged()">
+              <option *ngFor="let s of optionsSectorFilters" [value]="s">{{s}}</option>
+            </select>
+            <select [(ngModel)]="optionsSortKey" (change)="onOptionsBoardFiltersChanged()">
+              <option value="callDesc">Sort: Call Price</option>
+              <option value="putDesc">Sort: Put Price</option>
+              <option value="deltaDesc">Sort: Delta</option>
+              <option value="symbol">Sort: Symbol</option>
+            </select>
+          </div>
+
+          <div class="options-table-wrapper" [class.compact]="optionsCompactMode">
+            <div class="loading-overlay" *ngIf="optionsBoardLoading">
+              <div class="spinner"></div>
+            </div>
+            <table class="options-table" *ngIf="pagedOptionsSnapshots.length > 0">
+              <thead>
+                <tr class="header-group">
+                  <th colspan="3" class="calls-header">CALLS</th>
+                  <th rowspan="2" class="strike-header">STRIKE</th>
+                  <th colspan="3" class="puts-header">PUTS</th>
+                </tr>
+                <tr class="header-sub">
+                  <th>Bid</th>
+                  <th>Ask</th>
+                  <th>Delta</th>
+                  
+                  <th>Bid</th>
+                  <th>Ask</th>
+                  <th>Delta</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let opt of pagedOptionsSnapshots; trackBy: trackByOptionSymbol" class="option-row" [class.active]="selectedOrderBookSymbol === opt.symbol">
+                  <!-- Calls -->
+                  <td class="cell-quote text-success" [class.itm]="opt.strike < opt.spot" (click)="quickOptionTrade(opt.symbol, '1', opt.call.theoreticalPrice)">
+                    {{ Math.max(0.01, opt.call.theoreticalPrice - 0.05) | number:'1.2-2' }}
+                  </td>
+                  <td class="cell-quote text-success" [class.itm]="opt.strike < opt.spot" (click)="quickOptionTrade(opt.symbol, '2', opt.call.theoreticalPrice)">
+                    {{ Math.max(0.01, opt.call.theoreticalPrice + 0.05) | number:'1.2-2' }}
+                  </td>
+                  <td class="cell-greek text-muted">{{ opt.call.greeks.delta | number:'1.2-2' }}</td>
+                  
+                  <!-- Center Strike -->
+                  <td class="cell-strike" (click)="focusOptionSymbol(opt.symbol)">
+                    <div class="strike-val">{{ opt.strike | number:'1.2-2' }}</div>
+                    <div class="symbol-sub">{{ opt.symbol }} <span class="spot-price">(\${{ opt.spot | number:'1.2-2' }})</span></div>
+                  </td>
+                  
+                  <!-- Puts -->
+                  <td class="cell-quote text-danger" [class.itm]="opt.strike > opt.spot" (click)="quickOptionTrade(opt.symbol, '1', opt.put.theoreticalPrice)">
+                    {{ Math.max(0.01, opt.put.theoreticalPrice - 0.05) | number:'1.2-2' }}
+                  </td>
+                  <td class="cell-quote text-danger" [class.itm]="opt.strike > opt.spot" (click)="quickOptionTrade(opt.symbol, '2', opt.put.theoreticalPrice)">
+                    {{ Math.max(0.01, opt.put.theoreticalPrice + 0.05) | number:'1.2-2' }}
+                  </td>
+                  <td class="cell-greek text-muted">{{ opt.put.greeks.delta | number:'1.2-2' }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="empty-state" *ngIf="pagedOptionsSnapshots.length === 0 && !optionsBoardLoading">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <p>No options matched the current filter.</p>
+            </div>
+          </div>
+          
+          <div class="options-pagination" *ngIf="filteredOptionsSnapshots.length > optionsPageSize">
+            <button (click)="prevOptionsPage()" [disabled]="optionsPage === 1">Prev</button>
+            <span class="page-info">Page {{optionsPage}} of {{totalOptionsPages}}</span>
+            <button (click)="nextOptionsPage()" [disabled]="optionsPage === totalOptionsPages">Next</button>
+          </div>
+        </div>
         
         <!-- Market Heatmap -->
         <app-market-heatmap 

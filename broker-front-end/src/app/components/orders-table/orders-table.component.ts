@@ -432,11 +432,20 @@ export class OrdersTableComponent {
   get filteredOrders(): Order[] {
     switch (this.activeFilter) {
       case 'open':
-        return this.orders.filter(o => o.status === '0' || o.status === '1' || o.status === 'A');
+        return this.orders.filter(o => {
+          const s = (o.status || '').toUpperCase();
+          return s === '0' || s === '1' || s === 'A' || s === 'NEW' || s === 'PARTIALLY_FILLED' || s === 'PENDING_NEW' || s === 'PENDING_CANCEL';
+        });
       case 'filled':
-        return this.orders.filter(o => o.status === '2');
+        return this.orders.filter(o => {
+          const s = (o.status || '').toUpperCase();
+          return s === '2' || s === 'FILLED';
+        });
       case 'cancelled':
-        return this.orders.filter(o => o.status === '4' || o.status === '8' || o.status === 'C');
+        return this.orders.filter(o => {
+          const s = (o.status || '').toUpperCase();
+          return s === '4' || s === '8' || s === 'C' || s === 'CANCELED' || s === 'CANCELLED' || s === 'REJECTED' || s === 'EXPIRED';
+        });
       default:
         return this.orders;
     }
@@ -457,25 +466,29 @@ export class OrdersTableComponent {
   }
   
   getStatusText(status: string): string {
-    switch (status) {
-      case '0': return 'New';
-      case '1': return 'Partial';
-      case '2': return 'Filled';
-      case '4': return 'Cancelled';
-      case '8': return 'Rejected';
-      case 'A': return 'Pending';
-      case 'C': return 'Expired';
+    if (!status) return 'Unknown';
+    switch (status.toUpperCase()) {
+      case '0': case 'NEW': return 'New';
+      case '1': case 'PARTIALLY_FILLED': return 'Partial';
+      case '2': case 'FILLED': return 'Filled';
+      case '4': case 'CANCELED': case 'CANCELLED': return 'Cancelled';
+      case '8': case 'REJECTED': return 'Rejected';
+      case 'A': case 'PENDING_NEW': return 'Pending';
+      case 'PENDING_CANCEL': return 'Pnd Cancel';
+      case 'C': case 'EXPIRED': return 'Expired';
       default: return status;
     }
   }
   
   getStatusClass(status: string): string {
-    switch (status) {
-      case '0': case 'A': return 'new';
-      case '1': return 'partial';
-      case '2': return 'filled';
-      case '4': case 'C': return 'cancelled';
-      case '8': return 'rejected';
+    if (!status) return '';
+    switch (status.toUpperCase()) {
+      case '0': case 'A': case 'NEW': case 'PENDING_NEW': return 'new';
+      case '1': case 'PARTIALLY_FILLED': return 'partial';
+      case '2': case 'FILLED': return 'filled';
+      case '4': case 'C': case 'CANCELED': case 'CANCELLED': case 'EXPIRED': return 'cancelled';
+      case '8': case 'REJECTED': return 'rejected';
+      case 'PENDING_CANCEL': return 'partial';
       default: return '';
     }
   }
@@ -490,16 +503,23 @@ export class OrdersTableComponent {
   }
   
   canCancel(order: Order): boolean {
-    return order.status === '0' || order.status === '1' || order.status === 'A';
+    const s = (order.status || '').toUpperCase();
+    return s === '0' || s === '1' || s === 'A' || s === 'NEW' || s === 'PARTIALLY_FILLED' || s === 'PENDING_NEW';
   }
   
   canModify(order: Order): boolean {
-    return order.status === '0' || order.status === 'A';
+    const s = (order.status || '').toUpperCase();
+    return s === '0' || s === 'A' || s === 'NEW' || s === 'PENDING_NEW';
   }
   
-  formatTime(time: string | Date): string {
+  formatTime(time: string | Date | any[]): string {
     if (!time) return '-';
-    const date = new Date(time);
+    let date: Date;
+    if (Array.isArray(time)) {
+      date = new Date(time[0], time[1] - 1, time[2], time[3] || 0, time[4] || 0, time[5] || 0);
+    } else {
+      date = new Date(time);
+    }
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
   

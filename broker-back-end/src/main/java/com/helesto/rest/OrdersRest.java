@@ -57,6 +57,7 @@ public class OrdersRest {
         
         // Set initial status
         order.setStatus("NEW");
+        order.setCreatedAt(java.time.LocalDateTime.now());
         orderDao.persistOrder(order);
         
         // Send via FIX

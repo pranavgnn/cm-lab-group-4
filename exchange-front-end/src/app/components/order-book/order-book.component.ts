@@ -1,3 +1,4 @@
+// Watermark: Aarav Joshi
 import { Component, Input, OnInit, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { interval, Subject, of } from 'rxjs';

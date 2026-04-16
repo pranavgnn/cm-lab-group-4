@@ -103,6 +103,10 @@ public class ExecutionReportService {
     public void sendCancel(OrderEntity order, SessionID sessionID) throws SessionNotFound {
         LOG.info("Sending CANCELED for order: {}", order.getClOrdId());
         
+        order.setStatus("CANCELED");
+        order.setUpdatedAt(LocalDateTime.now());
+        orderDao.updateOrder(order);
+        
         ExecutionReport report = createBaseReport(order);
         report.set(new ExecType(ExecType.CANCELED));
         report.set(new OrdStatus(OrdStatus.CANCELED));
@@ -153,6 +157,10 @@ public class ExecutionReportService {
      */
     public void sendReject(OrderEntity order, int rejectReason, String rejectText, SessionID sessionID) throws SessionNotFound {
         LOG.info("Sending REJECTED for order: {} - {}", order.getClOrdId(), rejectText);
+        
+        order.setStatus("REJECTED");
+        order.setUpdatedAt(LocalDateTime.now());
+        orderDao.updateOrder(order);
         
         ExecutionReport report = createBaseReport(order);
         report.set(new ExecType(ExecType.REJECTED));
