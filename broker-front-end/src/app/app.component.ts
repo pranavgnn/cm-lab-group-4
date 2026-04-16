@@ -190,10 +190,12 @@ export class AppComponent implements OnInit, OnDestroy {
     'NEW',
     'PARTIALLY_FILLED',
     'FILLED',
+    'FILLED',
     'CANCELED',
     'REJECTED'
   ];
 
+  private previousOrderStatuses = new Map<string, string>();
   private pollingSubscription?: Subscription;
   private marketDataSubscription?: Subscription;
   private toastSubscription?: Subscription;
@@ -414,10 +416,50 @@ export class AppComponent implements OnInit, OnDestroy {
         return of([]);
       })
     ).subscribe(orders => {
+      this.detectStatusChanges(orders);
       this.orders = orders;
       this.loading = false;
       this.calculatePositions();
     });
+  }
+
+  private detectStatusChanges(newOrders: Order[]): void {
+    if (this.orders.length === 0 && newOrders.length > 0) {
+      // First load, just populate the map
+      newOrders.forEach(o => this.previousOrderStatuses.set(o.clOrdId, o.status));
+      return;
+    }
+
+    newOrders.forEach(order => {
+      const prevStatus = this.previousOrderStatuses.get(order.clOrdId);
+      const currentStatus = order.status;
+
+      if (prevStatus && prevStatus !== currentStatus) {
+        this.notifyStatusChange(order, currentStatus);
+      }
+      this.previousOrderStatuses.set(order.clOrdId, currentStatus);
+    });
+  }
+
+  private notifyStatusChange(order: Order, status: string): void {
+    const symbol = order.symbol;
+    const ordId = order.clOrdId || order.orderRefNumber || 'Order';
+    
+    switch (status.toUpperCase()) {
+      case 'FILLED':
+        this.notificationService.success('Order Filled', `${symbol} order ${ordId} has been fully filled.`);
+        break;
+      case 'PARTIALLY_FILLED':
+        this.notificationService.info('Partial Fill', `${symbol} order ${ordId} was partially filled.`);
+        break;
+      case 'CANCELED':
+      case 'CANCELLED':
+        this.notificationService.warning('Order Cancelled', `${symbol} order ${ordId} was cancelled.`);
+        break;
+      case 'REJECTED':
+        this.notificationService.error('Order Rejected', `${symbol} order ${ordId} was rejected by exchange.`);
+        break;
+    }
   }
 
   loadSessionInfo(): void {
@@ -437,6 +479,7 @@ export class AppComponent implements OnInit, OnDestroy {
         catchError(() => of([]))
       ))
     ).subscribe(orders => {
+      this.detectStatusChanges(orders);
       this.orders = orders;
       this.calculatePositions();
     });

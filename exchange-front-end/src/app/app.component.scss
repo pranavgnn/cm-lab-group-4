@@ -3425,3 +3425,220 @@ $header-height: 52px;
 .text-success { color: $success; }
 .text-danger { color: $danger; }
 .text-muted { color: $text-muted; }
+
+// ============================================
+// MARKET NEWS FEED
+// ============================================
+.news-feed-card {
+  background: $bg-secondary;
+  border: 1px solid $border-default;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+
+  .card-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid $border-default;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    h3 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      color: $text-primary;
+      svg { color: $info; }
+    }
+
+    .card-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .category-filter {
+        select {
+          background: $bg-tertiary;
+          border: 1px solid $border-default;
+          color: $text-secondary;
+          border-radius: 6px;
+          padding: 4px 8px;
+          font-size: 12px;
+          outline: none;
+          &:focus { border-color: $info; }
+        }
+      }
+    }
+  }
+
+  .news-list {
+    max-height: 500px;
+    overflow-y: auto;
+    
+    .news-item {
+      padding: 16px 20px;
+      border-bottom: 1px solid $border-muted;
+      transition: background 0.2s;
+      cursor: pointer;
+
+      &:last-child { border-bottom: none; }
+      &:hover { background: $bg-hover; }
+
+      &.breaking {
+        border-left: 4px solid $danger;
+        background: rgba($danger, 0.05);
+      }
+
+      .news-item-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 6px;
+        font-size: 11px;
+        
+        .news-source { color: $info; font-weight: 600; }
+        .news-time { color: $text-muted; }
+      }
+
+      .news-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: $text-primary;
+        margin-bottom: 8px;
+        line-height: 1.4;
+      }
+
+      .news-summary {
+        font-size: 12px;
+        color: $text-secondary;
+        line-height: 1.6;
+        margin-bottom: 12px;
+      }
+
+      .news-footer {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 11px;
+
+        .badge {
+          padding: 2px 8px;
+          background: $bg-tertiary;
+          border-radius: 10px;
+          color: $text-muted;
+        }
+
+        .news-sentiment {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          font-weight: 600;
+          &.positive { color: $success; }
+          &.negative { color: $danger; }
+          &.neutral { color: $text-muted; }
+        }
+
+        .news-impact {
+          margin-left: auto;
+          color: $warning;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          .impact-dot { width: 6px; height: 6px; border-radius: 50%; background: $warning; }
+        }
+      }
+    }
+  }
+}
+
+// ============================================
+// SONNER-STYLE TOASTS
+// ============================================
+.toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  min-width: 320px;
+  max-width: 420px;
+  background: rgba($bg-secondary, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid $border-default;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  animation: toast-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+
+  &:hover {
+    transform: scale(1.02);
+    background: $bg-secondary;
+  }
+
+  .toast-icon {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .toast-content {
+    flex: 1;
+    .toast-title { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+    .toast-message { font-size: 13px; color: $text-secondary; line-height: 1.4; }
+  }
+
+  .toast-close {
+    flex-shrink: 0;
+    background: none; border: none; color: $text-muted; padding: 4px;
+    cursor: pointer;
+    &:hover { color: $text-primary; }
+  }
+
+  &.success {
+    border-left: 4px solid $success;
+    .toast-icon { color: $success; }
+    .toast-title { color: $success; }
+  }
+
+  &.error {
+    border-left: 4px solid $danger;
+    .toast-icon { color: $danger; }
+    .toast-title { color: $danger; }
+  }
+
+  &.warning {
+    border-left: 4px solid $warning;
+    .toast-icon { color: $warning; }
+    .toast-title { color: $warning; }
+  }
+
+  &.info {
+    border-left: 4px solid $info;
+    .toast-icon { color: $info; }
+    .toast-title { color: $info; }
+  }
+}
+
+@keyframes toast-in {
+  from { transform: translateX(100%) scale(0.9); opacity: 0; }
+  to { transform: translateX(0) scale(1); opacity: 1; }
+}

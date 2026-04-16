@@ -88,12 +88,6 @@ import { Order } from '../../models/order.model';
                     <line x1="9" y1="9" x2="15" y2="15"/>
                   </svg>
                 </button>
-                <button *ngIf="canModify(order)" class="btn-modify" (click)="modifyOrder($event, order)" title="Modify Order">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
-                </button>
               </td>
             </tr>
           </tbody>
@@ -377,22 +371,9 @@ import { Order } from '../../models/order.model';
       transition: all 0.15s;
     }
     
-    .btn-cancel {
-      color: #ef4444;
-    }
-    
     .btn-cancel:hover {
       background: #fee2e2;
       border-color: #ef4444;
-    }
-    
-    .btn-modify {
-      color: #8b5cf6;
-    }
-    
-    .btn-modify:hover {
-      background: #f3e8ff;
-      border-color: #8b5cf6;
     }
     
     .empty-state {
@@ -424,7 +405,6 @@ export class OrdersTableComponent {
   
   @Output() orderSelect = new EventEmitter<Order>();
   @Output() orderCancel = new EventEmitter<Order>();
-  @Output() orderModify = new EventEmitter<Order>();
   @Output() export = new EventEmitter<void>();
   
   activeFilter: 'all' | 'open' | 'filled' | 'cancelled' = 'all';
@@ -534,11 +514,6 @@ export class OrdersTableComponent {
   cancelOrder(event: Event, order: Order): void {
     event.stopPropagation();
     this.orderCancel.emit(order);
-  }
-  
-  modifyOrder(event: Event, order: Order): void {
-    event.stopPropagation();
-    this.orderModify.emit(order);
   }
   
   exportOrders(): void {

@@ -179,6 +179,9 @@ export class AppComponent implements OnInit, OnDestroy {
   searchQuery = '';
   orderSearchQuery = '';
   orderStatusFilter = 'ALL';
+  // Toast notifications
+  toasts: any[] = [];
+  private previousOrderStatuses = new Map<string, string>();
   showFixResponseControls = false;
   readonly orderStatusOptions = [
     'ALL',
@@ -657,10 +660,56 @@ export class AppComponent implements OnInit, OnDestroy {
         return of([]);
       })
     ).subscribe(orders => {
+      this.detectStatusChanges(orders);
       this.orders = orders;
       this.loading = false;
       this.calculatePositions();
     });
+  }
+
+  private detectStatusChanges(newOrders: Order[]): void {
+    if (this.orders.length === 0 && newOrders.length > 0) {
+      newOrders.forEach(o => this.previousOrderStatuses.set(o.clOrdId, o.status));
+      return;
+    }
+
+    newOrders.forEach(order => {
+      const prevStatus = this.previousOrderStatuses.get(order.clOrdId);
+      const currentStatus = order.status;
+
+      if (prevStatus && prevStatus !== currentStatus) {
+        this.notifyStatusChange(order, currentStatus);
+      }
+      this.previousOrderStatuses.set(order.clOrdId, currentStatus);
+    });
+  }
+
+  private notifyStatusChange(order: Order, status: string): void {
+    const symbol = order.symbol;
+    const ordId = order.clOrdId || order.orderRefNumber || 'Order';
+    
+    switch (status.toUpperCase()) {
+      case 'FILLED':
+        this.showNotification('Order Filled', `${symbol} order ${ordId} has been fully filled.`, 'success');
+        break;
+      case 'CANCELED':
+      case 'CANCELLED':
+        this.showNotification('Order Cancelled', `${symbol} order ${ordId} was cancelled.`, 'warning');
+        break;
+      case 'REJECTED':
+        this.showNotification('Order Rejected', `${symbol} order ${ordId} was rejected by system.`, 'error');
+        break;
+    }
+  }
+
+  showNotification(title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info'): void {
+    const id = Date.now();
+    this.toasts.push({ id, title, message, type });
+    setTimeout(() => this.toasts = this.toasts.filter(t => t.id !== id), 5000);
+  }
+
+  dismissToast(id: number): void {
+    this.toasts = this.toasts.filter(t => t.id !== id);
   }
   
   loadSessionStatus(): void {
@@ -718,6 +767,7 @@ export class AppComponent implements OnInit, OnDestroy {
         catchError(() => of([]))
       ))
     ).subscribe(orders => {
+      this.detectStatusChanges(orders);
       this.orders = orders;
       this.calculatePositions();
       this.loadSessionStatus();
