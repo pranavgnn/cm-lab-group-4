@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { LiveQuote } from '../../services/live-market.service';
 
 @Component({
@@ -268,7 +268,7 @@ import { LiveQuote } from '../../services/live-market.service';
     }
   `]
 })
-export class MarketCardComponent {
+export class MarketCardComponent implements OnInit {
   @Input() symbol: string = '';
   @Input() quote: LiveQuote | null = null;
   @Input() inWatchlist: boolean = false;
@@ -313,6 +313,20 @@ export class MarketCardComponent {
     'SBUX': 'Starbucks',
     'COST': 'Costco',
   };
+
+  ngOnInit(): void {
+    if (!this.sparklineData || this.sparklineData.length === 0) {
+      // Generate random data once if none provided
+      const points = [];
+      let value = 50;
+      for (let i = 0; i < 20; i++) {
+        value += (Math.random() - 0.5) * 10;
+        value = Math.max(5, Math.min(95, value));
+        points.push(value);
+      }
+      this.sparklineData = points;
+    }
+  }
   
   getCompanyName(): string {
     return this.companyNames[this.symbol] || this.symbol;
@@ -334,17 +348,7 @@ export class MarketCardComponent {
   }
   
   getSparklinePoints(): string {
-    if (!this.sparklineData.length) {
-      // Generate random data if none provided
-      const points = [];
-      let value = 50;
-      for (let i = 0; i < 20; i++) {
-        value += (Math.random() - 0.5) * 10;
-        value = Math.max(5, Math.min(95, value));
-        points.push(`${(i / 19) * 100},${100 - ((value / 100) * 80 + 10)}`);
-      }
-      return points.join(' ');
-    }
+    if (!this.sparklineData || this.sparklineData.length === 0) return '';
     
     const min = Math.min(...this.sparklineData);
     const max = Math.max(...this.sparklineData);

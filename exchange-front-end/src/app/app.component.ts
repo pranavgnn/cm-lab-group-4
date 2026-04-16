@@ -40,16 +40,7 @@ interface MarketData {
   changePercent: number;
 }
 
-interface Position {
-  symbol: string;
-  quantity: number;
-  avgPrice: number;
-  currentPrice: number;
-  marketValue: number;
-  unrealizedPnL: number;
-  unrealizedPnLPercent: number;
-  realizedPnL: number;
-}
+
 
 interface Execution {
   execId: string;
@@ -61,52 +52,7 @@ interface Execution {
   orderId: string;
 }
 
-interface NewsItem {
-  id: string;
-  title: string;
-  summary: string;
-  source: string;
-  category: string;
-  symbol?: string;
-  sentiment: 'positive' | 'negative' | 'neutral';
-  timestamp: Date;
-  isBreaking: boolean;
-  impact: 'high' | 'medium' | 'low';
-}
-
-interface PriceAlert {
-  id: string;
-  symbol: string;
-  condition: 'above' | 'below';
-  price: number;
-  triggered: boolean;
-  createdAt: Date;
-}
-
-interface CurrencyPair {
-  pair: string;
-  base: string;
-  quote: string;
-  rate: number;
-  previousRate: number;
-  change: number;
-  changePercent: number;
-  bid: number;
-  ask: number;
-  high24h: number;
-  low24h: number;
-  volume: number;
-  lastUpdated: Date;
-  flag1: string;
-  flag2: string;
-}
-
-interface ExportFormat {
-  type: 'csv' | 'json' | 'xlsx';
-  label: string;
-  icon: string;
-}
-
+// Removed unused interfaces for News, Currency, Exports, Alerts
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
@@ -150,12 +96,6 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly responseInFlightKeys = new Set<string>();
   readonly sessionEventLimits = [20, 50, 100];
   
-  // Position Tracking
-  positions: Position[] = [];
-  totalPortfolioValue = 0;
-  totalUnrealizedPnL = 0;
-  totalRealizedPnL = 0;
-  
   // Trade History Blotter
   executions: Execution[] = [];
   
@@ -183,63 +123,7 @@ export class AppComponent implements OnInit, OnDestroy {
   // Market Depth (for chart)
   depthData: { bids: {price: number, total: number}[], asks: {price: number, total: number}[] } = { bids: [], asks: [] };
   
-  // Arbitrage & Spread Analysis
-  spreadOpportunities: {symbol: string, spread: number, spreadBps: number, opportunity: string}[] = [];
-  correlatedPairs: {pair: string, correlation: number, divergence: number, signal: string}[] = [];
-  marketInefficiencies: {symbol: string, type: string, magnitude: number, confidence: number}[] = [];
-  historicalSpreads: Map<string, number[]> = new Map();
-  
-  // Technical Indicators
-  vwapData: Map<string, number> = new Map();
-  rsiData: Map<string, number> = new Map();
-  volatilityData: Map<string, number> = new Map();
-  
-  // Current symbol indicators (for change detection)
-  currentVwap = 0;
-  currentRsi = 50;
-  currentVolatility = 0;
-  currentSpread = 0;
-  
-  // Market Statistics
-  totalMarketVolume = 0;
-  marketBreadth = { advancers: 0, decliners: 0, unchanged: 0 };
-  sectorPerformance: {sector: string, change: number, volume: number}[] = [];
-  
-  // News Feed
-  newsItems: NewsItem[] = [];
-  newsCategories = ['All', 'Markets', 'Earnings', 'Tech', 'Economy', 'Crypto'];
-  selectedNewsCategory = 'All';
-  
-  // Watchlist
-  watchlist: string[] = ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA'];
-  
-  // Alerts
-  priceAlerts: PriceAlert[] = [];
-  
-  // Currency Market Monitor
-  currencyPairs: CurrencyPair[] = [];
-  selectedCurrencyPair: string = 'EUR/USD';
-  currencyCategories = ['Major', 'Minor', 'Exotic'];
-  selectedCurrencyCategory = 'Major';
-  
-  // Export Options
-  exportFormats: ExportFormat[] = [
-    { type: 'csv', label: 'CSV', icon: '📄' },
-    { type: 'json', label: 'JSON', icon: '📋' },
-    { type: 'xlsx', label: 'Excel', icon: '📊' }
-  ];
-  
-  // Market Sentiment
-  marketSentiment = {
-    bullish: 65,
-    bearish: 25,
-    neutral: 10,
-    fearGreedIndex: 68,
-    trend: 'bullish' as 'bullish' | 'bearish' | 'neutral'
-  };
-  
-  // Portfolio Allocation
-  portfolioAllocation: { sector: string; value: number; percent: number; color: string }[] = [];
+  // Removed fluff variables
 
   private basePrices: Map<string, number> = new Map();
   
@@ -289,7 +173,6 @@ export class AppComponent implements OnInit, OnDestroy {
     // Update time every second
     setInterval(() => {
       this.currentTime = new Date();
-      this.updateAnalytics();
     }, 1000);
     
     // Refresh order book every 500ms 
@@ -297,37 +180,16 @@ export class AppComponent implements OnInit, OnDestroy {
       this.refreshOrderBook();
     }, 500);
     
-    // Initialize correlated pairs for arbitrage monitoring
-    this.initializeCorrelatedPairs();
-    
-    // Initialize news feed
-    this.initializeNews();
-    
-    // Initialize currency market
-    this.initializeCurrencyPairs();
-    
-    // Update currencies every 3 seconds
-    setInterval(() => {
-      this.updateCurrencyPrices();
-      this.updateMarketSentiment();
-    }, 3000);
-
-    // Update news every 30 seconds
-    setInterval(() => {
-      this.addRandomNews();
-    }, 30000);
-    
     // Initialize order book
     setTimeout(() => {
       this.refreshOrderBook();
       this.loadRecentTrades();
     }, 500);
     
-    // Initialize options pricing after a short delay for market data to load
+    // Initialize order book after delay
     setTimeout(() => {
-      this.updateOptionPrice();
-      this.loadOptionsChain();
-      this.updateMarketSentiment();
+      this.refreshOrderBook();
+      this.loadRecentTrades();
     }, 1500);
   }
   
@@ -570,7 +432,6 @@ export class AppComponent implements OnInit, OnDestroy {
     ).subscribe(orders => {
       this.orders = orders;
       this.loading = false;
-      this.calculatePositions();
     });
   }
   
@@ -630,7 +491,6 @@ export class AppComponent implements OnInit, OnDestroy {
       ))
     ).subscribe(orders => {
       this.orders = orders;
-      this.calculatePositions();
       this.loadSessionStatus();
       if (this.sessionEventsLive) {
         this.loadSessionEvents(this.sessionEventsLimit);
@@ -726,83 +586,8 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
   
-  // Position Tracking Methods
-  calculatePositions(): void {
-    const positionMap = new Map<string, { qty: number; totalCost: number; realizedPnL: number }>();
-    
-    // Process filled orders to calculate positions
-    const filledOrders = this.orders.filter(o => 
-      o.status?.toUpperCase() === 'FILLED' || o.status?.toUpperCase() === 'PARTIALLY_FILLED'
-    );
-    
-    filledOrders.forEach(order => {
-      const symbol = order.symbol;
-      const qty = order.filledQty || order.quantity;
-      const price = order.price;
-      const isBuy = order.side === '1';
-      
-      if (!positionMap.has(symbol)) {
-        positionMap.set(symbol, { qty: 0, totalCost: 0, realizedPnL: 0 });
-      }
-      
-      const pos = positionMap.get(symbol)!;
-      
-      if (isBuy) {
-        pos.qty += qty;
-        pos.totalCost += qty * price;
-      } else {
-        // Sell - realize P&L
-        if (pos.qty > 0) {
-          const avgCost = pos.totalCost / pos.qty;
-          const sellQty = Math.min(qty, pos.qty);
-          pos.realizedPnL += sellQty * (price - avgCost);
-          pos.totalCost -= sellQty * avgCost;
-          pos.qty -= sellQty;
-        }
-      }
-    });
-    
-    // Convert to Position array with current prices
-    this.positions = [];
-    this.totalPortfolioValue = 0;
-    this.totalUnrealizedPnL = 0;
-    this.totalRealizedPnL = 0;
-    
-    positionMap.forEach((pos, symbol) => {
-      if (pos.qty > 0) {
-        const stock = this.allStocks.find(s => s.symbol === symbol);
-        const currentPrice = stock?.price || this.basePrices.get(symbol) || 0;
-        const avgPrice = pos.totalCost / pos.qty;
-        const marketValue = pos.qty * currentPrice;
-        const unrealizedPnL = (currentPrice - avgPrice) * pos.qty;
-        const unrealizedPnLPercent = avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice) * 100 : 0;
-        
-        this.positions.push({
-          symbol,
-          quantity: pos.qty,
-          avgPrice,
-          currentPrice,
-          marketValue,
-          unrealizedPnL,
-          unrealizedPnLPercent,
-          realizedPnL: pos.realizedPnL
-        });
-        
-        this.totalPortfolioValue += marketValue;
-        this.totalUnrealizedPnL += unrealizedPnL;
-      }
-      this.totalRealizedPnL += pos.realizedPnL;
-    });
-    
-    // Sort by market value
-    this.positions.sort((a, b) => b.marketValue - a.marketValue);
-    
-    // Build executions blotter
-    this.buildExecutions();
-  }
-  
+  // Simplified executions builder
   buildExecutions(): void {
-    // Generate execution records from filled orders
     this.executions = this.orders
       .filter(o => o.status?.toUpperCase() === 'FILLED' || o.status?.toUpperCase() === 'PARTIALLY_FILLED')
       .map((order, idx) => ({
@@ -815,7 +600,7 @@ export class AppComponent implements OnInit, OnDestroy {
         orderId: order.clOrdId || order.orderRefNumber || ''
       }))
       .sort((a, b) => b.time.getTime() - a.time.getTime())
-      .slice(0, 20); // Show last 20 executions
+      .slice(0, 20);
   }
   
   // New Analytics Methods
@@ -857,14 +642,22 @@ export class AppComponent implements OnInit, OnDestroy {
   
   // Order Book Methods
   onOrderBookSymbolChange(): void {
-    // Update technical indicators for new symbol
+    // Update current symbol
     console.log('Order book symbol changed to:', this.selectedOrderBookSymbol);
-    this.updateCurrentIndicators();
     // Also update new order form symbol
     this.newOrder.symbol = this.selectedOrderBookSymbol;
     // Refresh order book immediately
     this.refreshOrderBook();
     this.loadRecentTrades();
+  }
+
+  onHeatmapStockSelect(event: any): void {
+    this.selectedOrderBookSymbol = event.symbol || event || 'AAPL';
+    this.onOrderBookSymbolChange();
+  }
+
+  trackByOrderId(index: number, order: any): string {
+    return order.orderRefNumber || order.clOrdId || index.toString();
   }
   
   refreshOrderBook(): void {
@@ -1001,19 +794,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.submitOrder();
   }
   
-  updateCurrentIndicators(): void {
-    const symbol = this.selectedOrderBookSymbol;
-    this.currentVwap = this.vwapData.get(symbol) || 0;
-    this.currentRsi = this.rsiData.get(symbol) || 50;
-    this.currentVolatility = this.volatilityData.get(symbol) || 0;
-    
-    const stock = this.allStocks.find(s => s.symbol === symbol);
-    if (stock && stock.bid > 0 && stock.ask > 0) {
-      this.currentSpread = ((stock.ask - stock.bid) / stock.price) * 10000;
-    } else {
-      this.currentSpread = 0;
-    }
-  }
+
 
   getOrderBookCategories(): StockCategory[] {
     // Return categories with only EQUITY stocks for the order book dropdown
@@ -1046,750 +827,5 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.allStocks.slice(0, 12);
   }
 
-  // ============= ARBITRAGE & SPREAD ANALYSIS =============
-  
-  initializeCorrelatedPairs(): void {
-    this.correlatedPairs = [
-      { pair: 'AAPL/MSFT', correlation: 0.85, divergence: 0, signal: 'NEUTRAL' },
-      { pair: 'GOOGL/META', correlation: 0.78, divergence: 0, signal: 'NEUTRAL' },
-      { pair: 'JPM/BAC', correlation: 0.92, divergence: 0, signal: 'NEUTRAL' },
-      { pair: 'XOM/CVX', correlation: 0.95, divergence: 0, signal: 'NEUTRAL' },
-      { pair: 'V/MA', correlation: 0.88, divergence: 0, signal: 'NEUTRAL' },
-      { pair: 'KO/PEP', correlation: 0.82, divergence: 0, signal: 'NEUTRAL' },
-      { pair: 'NVDA/AMD', correlation: 0.75, divergence: 0, signal: 'NEUTRAL' },
-      { pair: 'JNJ/PFE', correlation: 0.72, divergence: 0, signal: 'NEUTRAL' },
-    ];
-  }
-
-  updateAnalytics(): void {
-    if (this.allStocks.length === 0) return;
-    
-    this.updateSpreadOpportunities();
-    this.updateCorrelatedPairs();
-    this.updateMarketInefficiencies();
-    this.updateMarketStatistics();
-    this.updateTechnicalIndicators();
-  }
-
-  updateSpreadOpportunities(): void {
-    this.spreadOpportunities = this.allStocks
-      .filter(s => s.bid > 0 && s.ask > 0)
-      .map(s => {
-        const spread = s.ask - s.bid;
-        const spreadBps = (spread / s.price) * 10000;
-        let opportunity = 'LOW';
-        if (spreadBps > 10) opportunity = 'MEDIUM';
-        if (spreadBps > 25) opportunity = 'HIGH';
-        return { symbol: s.symbol, spread, spreadBps, opportunity };
-      })
-      .sort((a, b) => b.spreadBps - a.spreadBps)
-      .slice(0, 10);
-  }
-
-  updateCorrelatedPairs(): void {
-    this.correlatedPairs = this.correlatedPairs.map(pair => {
-      const [sym1, sym2] = pair.pair.split('/');
-      const stock1 = this.allStocks.find(s => s.symbol === sym1);
-      const stock2 = this.allStocks.find(s => s.symbol === sym2);
-      
-      if (!stock1 || !stock2) return pair;
-      
-      // Calculate divergence based on relative price changes
-      const change1 = stock1.changePercent || 0;
-      const change2 = stock2.changePercent || 0;
-      const expectedChange2 = change1 * pair.correlation;
-      const divergence = change2 - expectedChange2;
-      
-      let signal = 'NEUTRAL';
-      if (divergence > 0.5) signal = 'SELL_' + sym2;
-      if (divergence < -0.5) signal = 'BUY_' + sym2;
-      if (Math.abs(divergence) > 1.0) signal = 'STRONG_' + signal;
-      
-      return { ...pair, divergence: Math.round(divergence * 100) / 100, signal };
-    });
-  }
-
-  updateMarketInefficiencies(): void {
-    this.marketInefficiencies = [];
-    
-    this.allStocks.forEach(stock => {
-      // Check for momentum anomalies
-      if (Math.abs(stock.changePercent) > 3) {
-        this.marketInefficiencies.push({
-          symbol: stock.symbol,
-          type: stock.changePercent > 0 ? 'OVERBOUGHT' : 'OVERSOLD',
-          magnitude: Math.abs(stock.changePercent),
-          confidence: Math.min(95, 60 + Math.abs(stock.changePercent) * 5)
-        });
-      }
-      
-      // Check for unusual spread
-      const spreadBps = ((stock.ask - stock.bid) / stock.price) * 10000;
-      if (spreadBps > 20) {
-        this.marketInefficiencies.push({
-          symbol: stock.symbol,
-          type: 'WIDE_SPREAD',
-          magnitude: spreadBps,
-          confidence: Math.min(90, 50 + spreadBps)
-        });
-      }
-      
-      // Track historical spreads for volatility detection
-      if (!this.historicalSpreads.has(stock.symbol)) {
-        this.historicalSpreads.set(stock.symbol, []);
-      }
-      const history = this.historicalSpreads.get(stock.symbol)!;
-      history.push(spreadBps);
-      if (history.length > 60) history.shift(); // Keep last 60 samples
-    });
-    
-    // Sort by confidence
-    this.marketInefficiencies.sort((a, b) => b.confidence - a.confidence);
-    this.marketInefficiencies = this.marketInefficiencies.slice(0, 8);
-  }
-
-  updateMarketStatistics(): void {
-    this.totalMarketVolume = this.allStocks.reduce((sum, s) => sum + (s.volume || 0), 0);
-    
-    this.marketBreadth = {
-      advancers: this.allStocks.filter(s => s.change > 0).length,
-      decliners: this.allStocks.filter(s => s.change < 0).length,
-      unchanged: this.allStocks.filter(s => s.change === 0).length
-    };
-    
-    // Calculate sector performance
-    const sectorMap = new Map<string, {totalChange: number, count: number, volume: number}>();
-    this.allStocks.forEach(s => {
-      const current = sectorMap.get(s.sector) || {totalChange: 0, count: 0, volume: 0};
-      current.totalChange += s.changePercent || 0;
-      current.count++;
-      current.volume += s.volume || 0;
-      sectorMap.set(s.sector, current);
-    });
-    
-    this.sectorPerformance = Array.from(sectorMap.entries())
-      .map(([sector, data]) => ({
-        sector,
-        change: Math.round((data.totalChange / data.count) * 100) / 100,
-        volume: data.volume
-      }))
-      .sort((a, b) => b.change - a.change);
-  }
-
-  updateTechnicalIndicators(): void {
-    this.allStocks.forEach(stock => {
-      // Simplified VWAP calculation (in real system would use tick data)
-      const vwap = stock.price * 0.998 + (Math.random() - 0.5) * stock.price * 0.002;
-      this.vwapData.set(stock.symbol, Math.round(vwap * 100) / 100);
-      
-      // Simplified RSI (random walk around 50)
-      const currentRsi = this.rsiData.get(stock.symbol) || 50;
-      const rsiChange = (Math.random() - 0.5) * 5 + (stock.changePercent || 0) * 2;
-      const newRsi = Math.max(0, Math.min(100, currentRsi + rsiChange));
-      this.rsiData.set(stock.symbol, Math.round(newRsi));
-      
-      // Volatility (implied from spread)
-      const vol = ((stock.ask - stock.bid) / stock.price) * 100 * 16; // Annualized approximation
-      this.volatilityData.set(stock.symbol, Math.round(vol * 100) / 100);
-    });
-    
-    // Update current indicators for selected symbol
-    this.updateCurrentIndicators();
-  }
-
-  getVwap(symbol: string): number {
-    return this.vwapData.get(symbol) || 0;
-  }
-
-  getRsi(symbol: string): number {
-    return this.rsiData.get(symbol) || 50;
-  }
-
-  getVolatility(symbol: string): number {
-    return this.volatilityData.get(symbol) || 0;
-  }
-
-  getRsiClass(rsi: number): string {
-    if (rsi >= 70) return 'rsi-overbought';
-    if (rsi <= 30) return 'rsi-oversold';
-    return 'rsi-neutral';
-  }
-
-  getSignalClass(signal: string): string {
-    if (signal.includes('BUY')) return 'signal-buy';
-    if (signal.includes('SELL')) return 'signal-sell';
-    return 'signal-neutral';
-  }
-
-  getOpportunityClass(opportunity: string): string {
-    if (opportunity === 'HIGH') return 'opportunity-high';
-    if (opportunity === 'MEDIUM') return 'opportunity-medium';
-    return 'opportunity-low';
-  }
-
-  formatVolume(vol: number): string {
-    if (vol >= 1000000000) return (vol / 1000000000).toFixed(1) + 'B';
-    if (vol >= 1000000) return (vol / 1000000).toFixed(1) + 'M';
-    if (vol >= 1000) return (vol / 1000).toFixed(1) + 'K';
-    return vol.toString();
-  }
-
-  // ================== G4-M4: Options Pricing Methods ==================
-
-  updateOptionPrice(): void {
-    // Update spot price from market data
-    const stock = this.allStocks.find(s => s.symbol === this.optionsPricing.symbol);
-    if (stock) {
-      this.optionsPricing.spotPrice = stock.price;
-    }
-    
-    // Call API to get option price
-    const params = {
-      spot: this.optionsPricing.spotPrice,
-      strike: this.optionsPricing.strikePrice,
-      timeToExpiry: this.optionsPricing.daysToExpiry / 365,
-      riskFreeRate: this.optionsPricing.riskFreeRate / 100,
-      volatility: this.optionsPricing.volatility / 100,
-      isCall: this.optionsPricing.optionType === 'CALL'
-    };
-    
-    this.http.get<any>('/api/options/price', { params: params as any })
-      .pipe(catchError(() => of(null)))
-      .subscribe(result => {
-        if (result) {
-          this.optionsPricing.fairPrice = result.price || 0;
-          if (result.greeks) {
-            this.optionsPricing.greeks = {
-              delta: result.greeks.delta || 0,
-              gamma: result.greeks.gamma || 0,
-              theta: result.greeks.theta || 0,
-              vega: result.greeks.vega || 0,
-              rho: result.greeks.rho || 0
-            };
-          }
-        } else {
-          // Calculate locally as fallback
-          this.calculateOptionPriceLocally();
-        }
-      });
-  }
-
-  calculateOptionPriceLocally(): void {
-    const S = this.optionsPricing.spotPrice;
-    const K = this.optionsPricing.strikePrice;
-    const T = this.optionsPricing.daysToExpiry / 365;
-    const r = this.optionsPricing.riskFreeRate / 100;
-    const sigma = this.optionsPricing.volatility / 100;
-    const isCall = this.optionsPricing.optionType === 'CALL';
-    
-    // Black-Scholes calculation
-    const d1 = (Math.log(S / K) + (r + sigma * sigma / 2) * T) / (sigma * Math.sqrt(T));
-    const d2 = d1 - sigma * Math.sqrt(T);
-    
-    const Nd1 = this.normalCDF(d1);
-    const Nd2 = this.normalCDF(d2);
-    const Nnd1 = this.normalCDF(-d1);
-    const Nnd2 = this.normalCDF(-d2);
-    
-    if (isCall) {
-      this.optionsPricing.fairPrice = S * Nd1 - K * Math.exp(-r * T) * Nd2;
-      this.optionsPricing.greeks.delta = Nd1;
-    } else {
-      this.optionsPricing.fairPrice = K * Math.exp(-r * T) * Nnd2 - S * Nnd1;
-      this.optionsPricing.greeks.delta = Nd1 - 1;
-    }
-    
-    // Calculate other Greeks
-    const sqrtT = Math.sqrt(T);
-    const discount = Math.exp(-r * T);
-    const npd1 = this.normalPDF(d1);
-    
-    this.optionsPricing.greeks.gamma = npd1 / (S * sigma * sqrtT);
-    this.optionsPricing.greeks.vega = S * npd1 * sqrtT / 100;
-    this.optionsPricing.greeks.theta = isCall
-      ? (-S * npd1 * sigma / (2 * sqrtT) - r * K * discount * Nd2) / 365
-      : (-S * npd1 * sigma / (2 * sqrtT) + r * K * discount * Nnd2) / 365;
-    this.optionsPricing.greeks.rho = isCall
-      ? K * T * discount * Nd2 / 100
-      : -K * T * discount * Nnd2 / 100;
-  }
-
-  normalCDF(x: number): number {
-    const a1 =  0.254829592;
-    const a2 = -0.284496736;
-    const a3 =  1.421413741;
-    const a4 = -1.453152027;
-    const a5 =  1.061405429;
-    const p  =  0.3275911;
-    
-    const sign = x < 0 ? -1 : 1;
-    x = Math.abs(x) / Math.sqrt(2);
-    
-    const t = 1.0 / (1.0 + p * x);
-    const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-    
-    return 0.5 * (1.0 + sign * y);
-  }
-
-  normalPDF(x: number): number {
-    return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
-  }
-
-  loadOptionsChain(): void {
-    const stock = this.allStocks.find(s => s.symbol === this.optionsPricing.symbol);
-    if (!stock) return;
-    
-    const spotPrice = stock.price;
-    const chain: {type: string, strike: number, price: number, delta: number, iv: number}[] = [];
-    
-    // Generate strikes around spot price
-    const strikeStep = Math.max(1, Math.round(spotPrice / 20));
-    const minStrike = Math.floor(spotPrice * 0.85 / strikeStep) * strikeStep;
-    const maxStrike = Math.ceil(spotPrice * 1.15 / strikeStep) * strikeStep;
-    
-    for (let strike = minStrike; strike <= maxStrike; strike += strikeStep) {
-      for (const type of ['CALL', 'PUT']) {
-        const isCall = type === 'CALL';
-        const T = this.optionsPricing.daysToExpiry / 365;
-        const r = this.optionsPricing.riskFreeRate / 100;
-        const sigma = this.optionsPricing.volatility / 100;
-        
-        const d1 = (Math.log(spotPrice / strike) + (r + sigma * sigma / 2) * T) / (sigma * Math.sqrt(T));
-        const d2 = d1 - sigma * Math.sqrt(T);
-        
-        let price, delta;
-        if (isCall) {
-          price = spotPrice * this.normalCDF(d1) - strike * Math.exp(-r * T) * this.normalCDF(d2);
-          delta = this.normalCDF(d1);
-        } else {
-          price = strike * Math.exp(-r * T) * this.normalCDF(-d2) - spotPrice * this.normalCDF(-d1);
-          delta = this.normalCDF(d1) - 1;
-        }
-        
-        chain.push({
-          type: type,
-          strike: strike,
-          price: Math.max(0, price),
-          delta: delta,
-          iv: this.optionsPricing.volatility
-        });
-      }
-    }
-    
-    this.optionsChain = chain.sort((a, b) => a.strike - b.strike || (a.type === 'CALL' ? -1 : 1));
-  }
-
-  getMoneyness(): string {
-    const ratio = this.optionsPricing.spotPrice / this.optionsPricing.strikePrice;
-    const isCall = this.optionsPricing.optionType === 'CALL';
-    
-    if (Math.abs(ratio - 1) < 0.02) return 'ATM';
-    if (isCall) {
-      return ratio > 1 ? 'ITM' : 'OTM';
-    } else {
-      return ratio < 1 ? 'ITM' : 'OTM';
-    }
-  }
-
-  getMoneyessClass(): string {
-    const moneyness = this.getMoneyness();
-    if (moneyness === 'ITM') return 'itm';
-    if (moneyness === 'OTM') return 'otm';
-    return 'atm';
-  }
-
-  // Track-by function for order list performance
-  trackByOrderId(index: number, order: Order): string {
-    return order.orderRefNumber || order.clOrdId || index.toString();
-  }
-
-  // Handle stock selection from heatmap component
-  onHeatmapStockSelect(event: { symbol: string }): void {
-    this.selectedOrderBookSymbol = event.symbol;
-    this.newOrder.symbol = event.symbol;
-    this.onSymbolChange();
-  }
-
-  // News Methods
-  initializeNews(): void {
-    const headlines = [
-      { title: 'Fed Signals Potential Rate Cut in Q2', summary: 'Federal Reserve officials hint at possible interest rate reduction amid cooling inflation data. Markets react positively to dovish stance.', source: 'Bloomberg', category: 'Economy', sentiment: 'positive' as const, impact: 'high' as const },
-      { title: 'Apple Reports Record Q4 Revenue', summary: 'Tech giant Apple Inc. beats analyst expectations with $95B in quarterly revenue, driven by strong iPhone 15 sales and Services growth.', source: 'Reuters', category: 'Earnings', symbol: 'AAPL', sentiment: 'positive' as const, impact: 'high' as const },
-      { title: 'Tesla Unveils New Battery Technology', summary: 'Electric vehicle maker announces breakthrough in battery efficiency, promising 40% longer range for upcoming models.', source: 'CNBC', category: 'Tech', symbol: 'TSLA', sentiment: 'positive' as const, impact: 'medium' as const },
-      { title: 'Oil Prices Surge on Supply Concerns', summary: 'Crude oil prices jump 3% following OPEC+ production cut announcement and Middle East tensions.', source: 'WSJ', category: 'Markets', sentiment: 'neutral' as const, impact: 'medium' as const },
-      { title: 'Microsoft Cloud Revenue Beats Expectations', summary: 'Azure cloud platform growth exceeds 30% YoY, driving strong quarterly results for the software giant.', source: 'Bloomberg', category: 'Earnings', symbol: 'MSFT', sentiment: 'positive' as const, impact: 'high' as const },
-      { title: 'Crypto Markets Rally on ETF Approval Hopes', summary: 'Bitcoin surges past $65K as SEC signals potential approval of spot Bitcoin ETFs by major asset managers.', source: 'CoinDesk', category: 'Crypto', sentiment: 'positive' as const, impact: 'high' as const },
-      { title: 'Amazon Expands Same-Day Delivery Network', summary: 'E-commerce leader invests $2B in logistics infrastructure to enhance delivery capabilities across 50 new markets.', source: 'Reuters', category: 'Tech', symbol: 'AMZN', sentiment: 'positive' as const, impact: 'medium' as const },
-      { title: 'China Manufacturing PMI Shows Contraction', summary: 'Latest economic data indicates continued weakness in Chinese manufacturing sector, raising global growth concerns.', source: 'FT', category: 'Economy', sentiment: 'negative' as const, impact: 'medium' as const },
-      { title: 'NVIDIA Dominates AI Chip Market', summary: 'Semiconductor giant captures 80% market share in AI training chips, stock hits new all-time high.', source: 'WSJ', category: 'Tech', symbol: 'NVDA', sentiment: 'positive' as const, impact: 'high' as const },
-      { title: 'Google Announces Gemini AI Expansion', summary: 'Alphabet subsidiary reveals major updates to Gemini AI platform with enhanced multimodal capabilities.', source: 'TechCrunch', category: 'Tech', symbol: 'GOOGL', sentiment: 'positive' as const, impact: 'medium' as const }
-    ];
-
-    this.newsItems = headlines.map((h, i) => ({
-      id: `news-${i}`,
-      ...h,
-      timestamp: new Date(Date.now() - Math.random() * 3600000 * 4),
-      isBreaking: i < 2
-    }));
-    
-    this.newsItems.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }
-
-  addRandomNews(): void {
-    const templates = [
-      { title: '{symbol} Stock Rallies on Strong Volume', summary: 'Shares surge amid increased trading activity and positive analyst sentiment.', sentiment: 'positive' as const },
-      { title: 'Analysts Upgrade {symbol} to Buy', summary: 'Major investment bank raises price target citing improved fundamentals.', sentiment: 'positive' as const },
-      { title: '{symbol} Faces Regulatory Scrutiny', summary: 'Company under investigation for compliance issues, shares decline.', sentiment: 'negative' as const },
-      { title: 'Breaking: {symbol} CEO to Step Down', summary: 'Leadership transition announced, market reacts cautiously.', sentiment: 'neutral' as const }
-    ];
-    
-    const symbols = ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'NVDA', 'META'];
-    const sources = ['Bloomberg', 'Reuters', 'CNBC', 'WSJ'];
-    const template = templates[Math.floor(Math.random() * templates.length)];
-    const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-    
-    const newItem: NewsItem = {
-      id: `news-${Date.now()}`,
-      title: template.title.replace('{symbol}', symbol),
-      summary: template.summary,
-      source: sources[Math.floor(Math.random() * sources.length)],
-      category: 'Markets',
-      symbol: symbol,
-      sentiment: template.sentiment,
-      timestamp: new Date(),
-      isBreaking: Math.random() > 0.8,
-      impact: Math.random() > 0.7 ? 'high' : 'medium'
-    };
-    
-    this.newsItems.unshift(newItem);
-    if (this.newsItems.length > 20) this.newsItems.pop();
-  }
-
-  getFilteredNews(): NewsItem[] {
-    if (this.selectedNewsCategory === 'All') return this.newsItems;
-    return this.newsItems.filter(n => n.category === this.selectedNewsCategory);
-  }
-
-  getNewsAge(timestamp: Date): string {
-    const diff = Date.now() - timestamp.getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
-  }
-
-  // Watchlist Methods
-  isInWatchlist(symbol: string): boolean {
-    return this.watchlist.includes(symbol);
-  }
-
-  toggleWatchlist(symbol: string): void {
-    const index = this.watchlist.indexOf(symbol);
-    if (index >= 0) {
-      this.watchlist.splice(index, 1);
-    } else {
-      this.watchlist.push(symbol);
-    }
-  }
-
-  getWatchlistStocks(): StockQuote[] {
-    return this.allStocks.filter(s => this.watchlist.includes(s.symbol));
-  }
-
-  // Alert Methods
-  addPriceAlert(symbol: string, condition: 'above' | 'below', price: number): void {
-    this.priceAlerts.push({
-      id: `alert-${Date.now()}`,
-      symbol,
-      condition,
-      price,
-      triggered: false,
-      createdAt: new Date()
-    });
-  }
-
-  removeAlert(id: string): void {
-    this.priceAlerts = this.priceAlerts.filter(a => a.id !== id);
-  }
-
-  checkPriceAlerts(): void {
-    this.priceAlerts.forEach(alert => {
-      if (alert.triggered) return;
-      const stock = this.allStocks.find(s => s.symbol === alert.symbol);
-      if (!stock) return;
-      
-      if (alert.condition === 'above' && stock.price >= alert.price) {
-        alert.triggered = true;
-      } else if (alert.condition === 'below' && stock.price <= alert.price) {
-        alert.triggered = true;
-      }
-    });
-  }
-
-  // Currency Market Methods
-  initializeCurrencyPairs(): void {
-    const pairs = [
-      // Major pairs
-      { pair: 'EUR/USD', base: 'EUR', quote: 'USD', rate: 1.0876, flag1: '🇪🇺', flag2: '🇺🇸' },
-      { pair: 'GBP/USD', base: 'GBP', quote: 'USD', rate: 1.2734, flag1: '🇬🇧', flag2: '🇺🇸' },
-      { pair: 'USD/JPY', base: 'USD', quote: 'JPY', rate: 149.85, flag1: '🇺🇸', flag2: '🇯🇵' },
-      { pair: 'USD/CHF', base: 'USD', quote: 'CHF', rate: 0.8825, flag1: '🇺🇸', flag2: '🇨🇭' },
-      { pair: 'AUD/USD', base: 'AUD', quote: 'USD', rate: 0.6532, flag1: '🇦🇺', flag2: '🇺🇸' },
-      { pair: 'USD/CAD', base: 'USD', quote: 'CAD', rate: 1.3542, flag1: '🇺🇸', flag2: '🇨🇦' },
-      { pair: 'NZD/USD', base: 'NZD', quote: 'USD', rate: 0.6089, flag1: '🇳🇿', flag2: '🇺🇸' },
-      // Minor pairs
-      { pair: 'EUR/GBP', base: 'EUR', quote: 'GBP', rate: 0.8538, flag1: '🇪🇺', flag2: '🇬🇧' },
-      { pair: 'EUR/JPY', base: 'EUR', quote: 'JPY', rate: 162.94, flag1: '🇪🇺', flag2: '🇯🇵' },
-      { pair: 'GBP/JPY', base: 'GBP', quote: 'JPY', rate: 190.77, flag1: '🇬🇧', flag2: '🇯🇵' },
-      { pair: 'EUR/CHF', base: 'EUR', quote: 'CHF', rate: 0.9596, flag1: '🇪🇺', flag2: '🇨🇭' },
-      { pair: 'AUD/JPY', base: 'AUD', quote: 'JPY', rate: 97.83, flag1: '🇦🇺', flag2: '🇯🇵' },
-      // Exotic pairs
-      { pair: 'USD/MXN', base: 'USD', quote: 'MXN', rate: 17.12, flag1: '🇺🇸', flag2: '🇲🇽' },
-      { pair: 'USD/SGD', base: 'USD', quote: 'SGD', rate: 1.3412, flag1: '🇺🇸', flag2: '🇸🇬' },
-      { pair: 'USD/HKD', base: 'USD', quote: 'HKD', rate: 7.8123, flag1: '🇺🇸', flag2: '🇭🇰' },
-      { pair: 'EUR/TRY', base: 'EUR', quote: 'TRY', rate: 35.24, flag1: '🇪🇺', flag2: '🇹🇷' }
-    ];
-
-    this.currencyPairs = pairs.map(p => ({
-      ...p,
-      previousRate: p.rate,
-      change: 0,
-      changePercent: 0,
-      bid: p.rate - (Math.random() * 0.0005),
-      ask: p.rate + (Math.random() * 0.0005),
-      high24h: p.rate * (1 + Math.random() * 0.02),
-      low24h: p.rate * (1 - Math.random() * 0.02),
-      volume: Math.floor(Math.random() * 1000000) + 500000,
-      lastUpdated: new Date()
-    }));
-  }
-
-  updateCurrencyPrices(): void {
-    this.currencyPairs = this.currencyPairs.map(pair => {
-      const volatility = pair.pair.includes('TRY') || pair.pair.includes('MXN') ? 0.002 : 0.0005;
-      const change = (Math.random() - 0.5) * volatility * pair.rate;
-      const newRate = Math.max(0.0001, pair.rate + change);
-      const dailyChange = newRate - pair.previousRate;
-      const spread = newRate * (Math.random() * 0.0003 + 0.0001);
-      
-      return {
-        ...pair,
-        rate: newRate,
-        change: dailyChange,
-        changePercent: (dailyChange / pair.previousRate) * 100,
-        bid: newRate - spread,
-        ask: newRate + spread,
-        high24h: Math.max(pair.high24h, newRate),
-        low24h: Math.min(pair.low24h, newRate),
-        volume: pair.volume + Math.floor(Math.random() * 10000),
-        lastUpdated: new Date()
-      };
-    });
-  }
-
-  getFilteredCurrencyPairs(): CurrencyPair[] {
-    const majorPairs = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD'];
-    const minorPairs = ['EUR/GBP', 'EUR/JPY', 'GBP/JPY', 'EUR/CHF', 'AUD/JPY'];
-    
-    if (this.selectedCurrencyCategory === 'Major') {
-      return this.currencyPairs.filter(p => majorPairs.includes(p.pair));
-    } else if (this.selectedCurrencyCategory === 'Minor') {
-      return this.currencyPairs.filter(p => minorPairs.includes(p.pair));
-    } else {
-      return this.currencyPairs.filter(p => !majorPairs.includes(p.pair) && !minorPairs.includes(p.pair));
-    }
-  }
-
-  getSelectedCurrency(): CurrencyPair | undefined {
-    return this.currencyPairs.find(p => p.pair === this.selectedCurrencyPair);
-  }
-
-  // Export Methods
-  exportData(type: 'orders' | 'positions' | 'executions' | 'watchlist' | 'currencies', format: 'csv' | 'json' | 'xlsx'): void {
-    let data: any[] = [];
-    let filename = '';
-
-    switch (type) {
-      case 'orders':
-        data = this.orders.map(o => ({
-          OrderID: o.clOrdId || o.orderRefNumber,
-          Symbol: o.symbol,
-          Side: o.side === '1' ? 'BUY' : 'SELL',
-          Quantity: o.quantity,
-          Price: o.price,
-          Status: o.status,
-          FilledQty: o.filledQty || 0,
-          CreatedAt: o.createdAt
-        }));
-        filename = 'orders_export';
-        break;
-      case 'positions':
-        data = this.positions.map(p => ({
-          Symbol: p.symbol,
-          Quantity: p.quantity,
-          AvgPrice: p.avgPrice.toFixed(2),
-          CurrentPrice: p.currentPrice.toFixed(2),
-          MarketValue: p.marketValue.toFixed(2),
-          UnrealizedPnL: p.unrealizedPnL.toFixed(2),
-          UnrealizedPnLPercent: p.unrealizedPnLPercent.toFixed(2) + '%',
-          RealizedPnL: p.realizedPnL.toFixed(2)
-        }));
-        filename = 'positions_export';
-        break;
-      case 'executions':
-        data = this.executions.map(e => ({
-          ExecID: e.execId,
-          Symbol: e.symbol,
-          Side: e.side === '1' ? 'BUY' : 'SELL',
-          Quantity: e.quantity,
-          Price: e.price.toFixed(2),
-          Time: e.time.toISOString(),
-          OrderID: e.orderId
-        }));
-        filename = 'executions_export';
-        break;
-      case 'watchlist':
-        data = this.getWatchlistStocks().map(s => ({
-          Symbol: s.symbol,
-          Name: s.name,
-          Sector: s.sector,
-          Price: s.price.toFixed(2),
-          Change: s.change.toFixed(2),
-          ChangePercent: s.changePercent.toFixed(2) + '%',
-          Bid: s.bid.toFixed(2),
-          Ask: s.ask.toFixed(2),
-          Volume: s.volume
-        }));
-        filename = 'watchlist_export';
-        break;
-      case 'currencies':
-        data = this.currencyPairs.map(c => ({
-          Pair: c.pair,
-          Rate: c.rate.toFixed(5),
-          Change: c.change.toFixed(5),
-          ChangePercent: c.changePercent.toFixed(4) + '%',
-          Bid: c.bid.toFixed(5),
-          Ask: c.ask.toFixed(5),
-          High24h: c.high24h.toFixed(5),
-          Low24h: c.low24h.toFixed(5),
-          Volume: c.volume,
-          LastUpdated: c.lastUpdated.toISOString()
-        }));
-        filename = 'currencies_export';
-        break;
-    }
-
-    if (format === 'csv') {
-      this.downloadCSV(data, filename);
-    } else if (format === 'json') {
-      this.downloadJSON(data, filename);
-    } else if (format === 'xlsx') {
-      this.downloadCSV(data, filename); // Fallback to CSV for xlsx
-    }
-  }
-
-  private downloadCSV(data: any[], filename: string): void {
-    if (data.length === 0) return;
-    
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row => headers.map(h => {
-        const val = row[h];
-        const strVal = String(val ?? '');
-        return strVal.includes(',') ? `"${strVal}"` : strVal;
-      }).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${filename}_${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-  }
-
-  private downloadJSON(data: any[], filename: string): void {
-    const jsonContent = JSON.stringify(data, null, 2);
-    const blob = new Blob([jsonContent], { type: 'application/json' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${filename}_${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-  }
-
-  // Portfolio Allocation
-  calculatePortfolioAllocation(): { sector: string; value: number; percent: number; color: string }[] {
-    const sectorColors: Record<string, string> = {
-      'Technology': '#3b82f6',
-      'TECHNOLOGY': '#3b82f6',
-      'Healthcare': '#10b981',
-      'HEALTHCARE': '#10b981',
-      'Finance': '#f59e0b',
-      'FINANCE': '#f59e0b',
-      'Consumer': '#ef4444',
-      'CONSUMER': '#ef4444',
-      'Energy': '#8b5cf6',
-      'ENERGY': '#8b5cf6',
-      'Other': '#6b7280'
-    };
-
-    const sectorTotals = new Map<string, number>();
-    
-    this.positions.forEach(pos => {
-      const stock = this.allStocks.find(s => s.symbol === pos.symbol);
-      const sector = stock?.sector || 'Other';
-      const current = sectorTotals.get(sector) || 0;
-      sectorTotals.set(sector, current + pos.marketValue);
-    });
-
-    const total = this.totalPortfolioValue || 1;
-    const allocation: { sector: string; value: number; percent: number; color: string }[] = [];
-    
-    sectorTotals.forEach((value, sector) => {
-      allocation.push({
-        sector,
-        value,
-        percent: (value / total) * 100,
-        color: sectorColors[sector] || sectorColors['Other']
-      });
-    });
-
-    return allocation.sort((a, b) => b.value - a.value);
-  }
-
-  // Market Sentiment
-  updateMarketSentiment(): void {
-    const advancers = this.allStocks.filter(s => s.changePercent > 0).length;
-    const decliners = this.allStocks.filter(s => s.changePercent < 0).length;
-    const total = this.allStocks.length || 1;
-    
-    this.marketSentiment.bullish = Math.round((advancers / total) * 100);
-    this.marketSentiment.bearish = Math.round((decliners / total) * 100);
-    this.marketSentiment.neutral = 100 - this.marketSentiment.bullish - this.marketSentiment.bearish;
-    
-    this.marketSentiment.fearGreedIndex = Math.round(50 + (this.marketSentiment.bullish - this.marketSentiment.bearish) * 0.4);
-    this.marketSentiment.trend = this.marketSentiment.bullish > 50 ? 'bullish' : this.marketSentiment.bearish > 50 ? 'bearish' : 'neutral';
-  }
-
-  getFearGreedLabel(): string {
-    const index = this.marketSentiment.fearGreedIndex;
-    if (index <= 20) return 'Extreme Fear';
-    if (index <= 40) return 'Fear';
-    if (index <= 60) return 'Neutral';
-    if (index <= 80) return 'Greed';
-    return 'Extreme Greed';
-  }
-
-  getFearGreedColor(): string {
-    const index = this.marketSentiment.fearGreedIndex;
-    if (index <= 25) return '#ef4444';
-    if (index <= 45) return '#f97316';
-    if (index <= 55) return '#eab308';
-    if (index <= 75) return '#84cc16';
-    return '#22c55e';
-  }
+  // Removed unused methods and analytics logic as per UI simplification request
 }

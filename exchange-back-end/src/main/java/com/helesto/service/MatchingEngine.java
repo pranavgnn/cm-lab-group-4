@@ -29,6 +29,9 @@ public class MatchingEngine {
     
     @Inject
     TelemetryService telemetryService;
+
+    @Inject
+    BlackScholesPricingService bsPricingService;
     
     private final AtomicLong execIdSequence = new AtomicLong(1);
     private final AtomicLong tradeIdSequence = new AtomicLong(1);
@@ -50,6 +53,12 @@ public class MatchingEngine {
         result.side = incomingOrder.side;
         result.originalQty = incomingOrder.originalQty;
         result.leavesQty = incomingOrder.leavesQty; // Initialize with order's leaves qty
+        
+        // Check if this is an option order
+        ReferenceDataService.Security security = referenceDataService.getSecurity(incomingOrder.symbol);
+        if (security != null && "OPTION".equals(security.securityType)) {
+            return processOptionOrder(incomingOrder, result, security, startTime);
+        }
         
         // Market order handling
         if ("1".equals(incomingOrder.orderType) || "MARKET".equals(incomingOrder.orderType)) {
@@ -310,6 +319,87 @@ public class MatchingEngine {
     
     private String generateTradeId() {
         return "TRADE-" + System.currentTimeMillis() + "-" + tradeIdSequence.getAndIncrement();
+    }
+    
+    /**
+     * Process an option order using Black-Scholes automated market making
+     */
+    private MatchResult processOptionOrder(OrderBookManager.BookOrder order, MatchResult result, ReferenceDataService.Security security, long startTime) {
+        LOG.info("Processing option order using Black-Scholes automated matching. Symbol: {}", order.symbol);
+        
+        // 1. Get underlying price
+        ReferenceDataService.MarketData underlyingMd = referenceDataService.getMarketData(security.underlyingSymbol);
+        double spotPrice = underlyingMd != null ? underlyingMd.lastPrice : 100.0;
+        
+        // 2. Compute time to expiry in years
+        double timeToExpiry = 30.0 / 365.0; // default 30 days
+        try {
+            java.time.LocalDate expiry = java.time.LocalDate.parse(security.expiryDate, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), expiry);
+            timeToExpiry = Math.max(1, daysBetween) / 365.0;
+        } catch (Exception e) {
+            LOG.debug("Could not parse expiry date {} for symbol {}", security.expiryDate, order.symbol);
+        }
+        
+        // 3. Compute BS Price
+        boolean isCall = "CALL".equals(security.optionType);
+        double bsPrice = isCall 
+                ? bsPricingService.callPrice(spotPrice, security.strikePrice, timeToExpiry, 0.05, 0.20)
+                : bsPricingService.putPrice(spotPrice, security.strikePrice, timeToExpiry, 0.05, 0.20);
+                
+        double fillPrice = bsPrice;
+        
+        // 4. Fill logic
+        boolean shouldFill = false;
+        if ("1".equals(order.orderType) || "MARKET".equals(order.orderType)) {
+            shouldFill = true;
+        } else if ("2".equals(order.orderType) || "LIMIT".equals(order.orderType)) {
+            // For a buy order, limit price must be >= bsPrice
+            if (("BUY".equals(order.side) || "1".equals(order.side)) && order.price >= bsPrice) {
+                shouldFill = true;
+                fillPrice = Math.min(order.price, bsPrice); // Give price improvement
+            } else if (("SELL".equals(order.side) || "2".equals(order.side)) && order.price <= bsPrice) {
+                shouldFill = true;
+                fillPrice = Math.max(order.price, bsPrice); // Give price improvement
+            }
+        }
+        
+        if (shouldFill) {
+            Fill fill = new Fill();
+            fill.execId = generateExecId();
+            fill.tradeId = generateTradeId();
+            fill.price = fillPrice;
+            fill.quantity = order.leavesQty;
+            fill.contraOrderId = "MM-BS-AUTO";
+            fill.contraClientId = "MARKET_MAKER_1";
+            fill.timestamp = System.currentTimeMillis();
+            
+            result.fills.add(fill);
+            result.filledQty = order.leavesQty;
+            result.leavesQty = 0;
+            result.avgPrice = fillPrice;
+            result.status = OrderStatus.FILLED;
+        } else {
+            // Add to book or cancel based on TIF
+            if ("3".equals(order.timeInForce) || "IOC".equals(order.timeInForce) || "4".equals(order.timeInForce) || "FOK".equals(order.timeInForce)) {
+                result.status = OrderStatus.CANCELED;
+                result.canceledQty = order.leavesQty;
+                result.leavesQty = 0;
+            } else {
+                orderBookManager.addOrder(order);
+                result.status = OrderStatus.NEW;
+                result.addedToBook = true;
+            }
+        }
+        
+        long matchTimeNanos = System.nanoTime() - startTime;
+        boolean success = !result.fills.isEmpty();
+        telemetryService.recordMatchAttempt(success, matchTimeNanos);
+        if (success) {
+            telemetryService.recordTradeGenerated();
+        }
+        
+        return result;
     }
     
     // ================== Result Classes ==================

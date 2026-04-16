@@ -71,6 +71,7 @@ services:
       QUARKUS_DATASOURCE_JDBC_URL: "jdbc:postgresql://postgres:5432/postgres"
       QUARKUS_DATASOURCE_USERNAME: postgres
       QUARKUS_DATASOURCE_PASSWORD: postgres
+      QUICKFIX_HOST: exchange-back-end
     networks:
       - qfj-network
     logging:
@@ -121,8 +122,8 @@ services:
 
   loadtest-dashboard:
     build:
-      context: .
-      dockerfile: ./loadtest-dashboard/Dockerfile
+      context: ./loadtest-dashboard
+      dockerfile: Dockerfile
     container_name: loadtest-dashboard
     restart: unless-stopped
     ports:

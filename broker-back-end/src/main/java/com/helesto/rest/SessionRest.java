@@ -25,6 +25,9 @@ public class SessionRest {
     @Inject
     Trader trader;
 
+    @Inject
+    com.helesto.core.TraderApplication traderApplication;
+
     public static class SessionStatus {
         public boolean isConnected;
         public String targetHost;
@@ -43,7 +46,7 @@ public class SessionRest {
     public SessionStatus getSessionStatus() {
         LOG.info("GET /session");
         return new SessionStatus(
-                trader.isInitiatorStarted(),
+                trader.isInitiatorStarted() && traderApplication.isSessionLoggedOn(),
                 "localhost",
                 "9876"
         );

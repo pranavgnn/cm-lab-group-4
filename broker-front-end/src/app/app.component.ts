@@ -75,22 +75,6 @@ interface Position {
   unrealizedPnLPercent: number;
 }
 
-interface NewsArticle {
-  title: string;
-  source: string;
-  url: string;
-  publishedAt: string;
-  sentiment: 'bullish' | 'bearish' | 'neutral';
-  relatedSymbols: string[];
-}
-
-interface SectorPerformance {
-  name: string;
-  change: number;
-  volume: number;
-  leaders: string[];
-}
-
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
@@ -158,12 +142,6 @@ export class AppComponent implements OnInit, OnDestroy {
     { label: 'ATM +/- 2', value: 2 },
     { label: 'ATM +/- 3', value: 3 }
   ];
-
-  // Live news articles
-  newsArticles: NewsArticle[] = [];
-
-  // Sector Performance
-  sectorPerformance: SectorPerformance[] = [];
 
   // Market indices
   marketIndices = [
@@ -262,8 +240,6 @@ export class AppComponent implements OnInit, OnDestroy {
     this.loadSessionInfo();
     this.loadTradableSymbols();
     this.loadMarketData();
-    this.loadNewsArticles();
-    this.loadSectorPerformance();
     this.startPolling();
     this.startMarketDataPolling();
 
@@ -1523,42 +1499,7 @@ export class AppComponent implements OnInit, OnDestroy {
     return Math.min(max, Math.max(min, value));
   }
 
-  // News and Market Data Methods
-  loadNewsArticles(): void {
-    const sources = ['Reuters', 'Bloomberg', 'CNBC', 'MarketWatch', 'WSJ', 'Financial Times'];
-
-    const headlines = [
-      { title: 'Tech Stocks Rally as AI Demand Surges', symbols: ['NVDA', 'GOOGL', 'MSFT'], sentiment: 'bullish' as const },
-      { title: 'Fed Signals Potential Rate Cut in Q2', symbols: ['SPY', 'JPM', 'BAC'], sentiment: 'bullish' as const },
-      { title: 'Apple Unveils New AI Features for iPhone', symbols: ['AAPL'], sentiment: 'bullish' as const },
-      { title: 'Oil Prices Drop on Increased Supply', symbols: ['XOM', 'CVX', 'COP'], sentiment: 'bearish' as const },
-      { title: 'Retail Sales Disappoint in February', symbols: ['WMT', 'TGT', 'COST'], sentiment: 'bearish' as const },
-      { title: 'Tesla Expands Charging Network Globally', symbols: ['TSLA'], sentiment: 'bullish' as const },
-      { title: 'Healthcare Stocks Steady Amid Policy Uncertainty', symbols: ['JNJ', 'UNH', 'PFE'], sentiment: 'neutral' as const },
-      { title: 'Amazon Cloud Revenue Beats Expectations', symbols: ['AMZN'], sentiment: 'bullish' as const },
-      { title: 'Banking Sector Faces Regulatory Pressure', symbols: ['GS', 'MS', 'JPM'], sentiment: 'bearish' as const },
-      { title: 'Semiconductor Shortage Eases, Intel Benefits', symbols: ['INTC', 'AMD'], sentiment: 'bullish' as const },
-    ];
-
-    this.newsArticles = headlines.map((h, i) => ({
-      title: h.title,
-      source: sources[i % sources.length],
-      url: `https://www.${sources[i % sources.length].toLowerCase().replace(' ', '')}.com/markets/${Date.now()}`,
-      publishedAt: new Date(Date.now() - i * 3600000).toISOString(),
-      sentiment: h.sentiment,
-      relatedSymbols: h.symbols
-    }));
-  }
-
-  loadSectorPerformance(): void {
-    this.sectorPerformance = [
-      { name: 'Technology', change: 2.45, volume: 125000000, leaders: ['NVDA', 'MSFT', 'AAPL'] },
-      { name: 'Healthcare', change: 0.82, volume: 45000000, leaders: ['UNH', 'LLY', 'JNJ'] },
-      { name: 'Finance', change: -0.35, volume: 78000000, leaders: ['JPM', 'V', 'MA'] },
-      { name: 'Energy', change: -1.25, volume: 52000000, leaders: ['XOM', 'CVX', 'COP'] },
-      { name: 'Consumer', change: 1.12, volume: 67000000, leaders: ['AMZN', 'TSLA', 'HD'] },
-    ];
-  }
+  // Market Data Methods
 
   updateMarketIndices(): void {
     this.marketIndices = this.marketIndices.map(idx => ({
