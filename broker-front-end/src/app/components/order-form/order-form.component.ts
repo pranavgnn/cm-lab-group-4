@@ -14,564 +14,468 @@ export interface OrderFormData {
 @Component({
   selector: 'app-order-form',
   template: `
-    <div class="order-form-container">
-      <div class="form-header">
-        <h3>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-          </svg>
-          Place Order
-        </h3>
-        <div class="symbol-badge" *ngIf="symbol">
-          {{ symbol }}
-          <span class="live-price" [class.positive]="(quote?.changePercent || 0) >= 0" [class.negative]="(quote?.changePercent || 0) < 0">
+    <div class="order-form-card" [class.is-sell]="formData.side === 'SELL'">
+      <!-- Header -->
+      <div class="header">
+        <div class="title-wrap">
+          <div class="action-badge" [class.sell]="formData.side === 'SELL'">
+            {{ formData.side === 'BUY' ? 'BUY' : 'SELL' }}
+          </div>
+          <h3>Execution Form</h3>
+        </div>
+        
+        <div class="live-info" *ngIf="symbol">
+          <div class="symbol">{{ symbol }}</div>
+          <div class="price" [class.up]="(quote?.changePercent || 0) >= 0" [class.down]="(quote?.changePercent || 0) < 0">
             \${{ quote?.price | number:'1.2-2' }}
-          </span>
+          </div>
+          <div class="indicator">
+            <span class="dot"></span>
+            Live
+          </div>
         </div>
       </div>
 
+      <!-- Main Toggle -->
       <div class="side-toggle">
-        <button class="side-btn buy" [class.active]="formData.side === 'BUY'" (click)="setSide('BUY')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="18 15 12 9 6 15"/>
-          </svg>
-          Buy
-        </button>
-        <button class="side-btn sell" [class.active]="formData.side === 'SELL'" (click)="setSide('SELL')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-          Sell
-        </button>
+        <button [class.active]="formData.side === 'BUY'" (click)="setSide('BUY')">Purchase</button>
+        <button [class.active]="formData.side === 'SELL'" (click)="setSide('SELL')">Liquidation</button>
       </div>
 
-      <div class="form-group">
-        <label>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-            <line x1="3" y1="9" x2="21" y2="9"/>
-            <line x1="9" y1="21" x2="9" y2="9"/>
-          </svg>
-          Order Type
-        </label>
-        <div class="order-type-grid">
-          <button *ngFor="let type of orderTypes" 
-                  [class.active]="formData.orderType === type.value"
-                  (click)="setOrderType(type.value)"
-                  [title]="type.description">
-            {{ type.label }}
-          </button>
+      <!-- Execution Grid -->
+      <div class="form-grid">
+        <div class="form-item span-all">
+          <label>Order Type</label>
+          <div class="grid-options">
+            <button *ngFor="let type of orderTypes" 
+                    [class.active]="formData.orderType === type.value"
+                    (click)="setOrderType(type.value)">
+              {{ type.label }}
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-              <line x1="7" y1="7" x2="7.01" y2="7"/>
-            </svg>
-            Symbol
-          </label>
-          <div class="input-with-icon">
-            <input type="text" 
-                   [(ngModel)]="formData.symbol" 
-                   (input)="onSymbolChange()"
-                   placeholder="AAPL"
-                   [class.error]="symbolError">
-            <span class="input-icon" *ngIf="symbolValid">✓</span>
+        <div class="form-row">
+          <div class="form-item">
+            <label>Ticker</label>
+            <input type="text" [(ngModel)]="formData.symbol" (input)="onSymbolChange()" placeholder="SYM" spellcheck="false">
           </div>
-          <span class="error-text" *ngIf="symbolError">{{ symbolError }}</span>
-        </div>
-        
-        <div class="form-group">
-          <label>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="8.5" cy="7" r="4"/>
-              <line x1="20" y1="8" x2="20" y2="14"/>
-              <line x1="23" y1="11" x2="17" y2="11"/>
-            </svg>
-            Quantity
-          </label>
-          <div class="quantity-input">
-            <button class="qty-btn" (click)="adjustQuantity(-10)">-10</button>
-            <button class="qty-btn" (click)="adjustQuantity(-1)">-</button>
-            <input type="number" [(ngModel)]="formData.quantity" min="1">
-            <button class="qty-btn" (click)="adjustQuantity(1)">+</button>
-            <button class="qty-btn" (click)="adjustQuantity(10)">+10</button>
+          <div class="form-item">
+            <label>Shares</label>
+            <div class="qty-control">
+              <button (click)="adjustQuantity(-1)">-</button>
+              <input type="number" [(ngModel)]="formData.quantity" min="1">
+              <button (click)="adjustQuantity(1)">+</button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="form-row" *ngIf="formData.orderType !== 'MARKET'">
-        <div class="form-group" *ngIf="formData.orderType === 'LIMIT' || formData.orderType === 'STOP_LIMIT'">
-          <label>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="1" x2="12" y2="23"/>
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-            </svg>
-            Limit Price
-          </label>
-          <div class="price-input">
-            <span class="currency">$</span>
-            <input type="number" [(ngModel)]="formData.price" step="0.01" min="0.01">
-            <button class="set-market" (click)="setMarketPrice()">MKT</button>
+        <div class="form-item span-all">
+          <label>Allocation Shortcut</label>
+          <div class="chip-row">
+            <button *ngFor="let p of quickPercents" (click)="applyPercentOfBalance(p)">{{ p }}%</button>
           </div>
         </div>
-        
-        <div class="form-group" *ngIf="formData.orderType === 'STOP' || formData.orderType === 'STOP_LIMIT'">
-          <label>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="15" y1="9" x2="9" y2="15"/>
-              <line x1="9" y1="9" x2="15" y2="15"/>
-            </svg>
-            Stop Price
-          </label>
-          <div class="price-input">
-            <span class="currency">$</span>
-            <input type="number" [(ngModel)]="formData.stopPrice" step="0.01" min="0.01">
+
+        <div class="price-grid" *ngIf="formData.orderType !== 'MARKET'">
+          <div class="form-item" *ngIf="formData.orderType === 'LIMIT' || formData.orderType === 'STOP_LIMIT'">
+            <label>Limit Price (\$)</label>
+            <div class="input-with-action">
+              <span class="symbol-prefix">$</span>
+              <input type="number" [(ngModel)]="formData.price" (input)="onPriceInput()" step="0.01">
+              <button class="auto-btn" (click)="setMarketPrice()" [class.synced]="!userModifiedPrice" title="Sync with Market">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-item" *ngIf="formData.orderType === 'STOP' || formData.orderType === 'STOP_LIMIT'">
+            <label>Stop Target (\$)</label>
+            <div class="input-with-action">
+              <span class="symbol-prefix">$</span>
+              <input type="number" [(ngModel)]="formData.stopPrice" (input)="onStopPriceInput()" step="0.01">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-item span-all">
+          <label>Time In Force</label>
+          <div class="segmented-control">
+            <button *ngFor="let tif of timeInForceOptions" 
+                    [class.active]="formData.timeInForce === tif.value"
+                    (click)="setTimeInForce(tif.value)">
+              {{ tif.label }}
+            </button>
           </div>
         </div>
       </div>
 
-      <div class="form-group">
-        <label>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-          Time in Force
-        </label>
-        <div class="tif-grid">
-          <button *ngFor="let tif of timeInForceOptions"
-                  [class.active]="formData.timeInForce === tif.value"
-                  (click)="setTimeInForce(tif.value)"
-                  [title]="tif.description">
-            {{ tif.label }}
-          </button>
-        </div>
-      </div>
-
-      <div class="order-summary">
-        <div class="summary-header">Order Summary</div>
-        <div class="summary-row">
-          <span>Action</span>
-          <span class="value" [class.buy]="formData.side === 'BUY'" [class.sell]="formData.side === 'SELL'">
-            {{ formData.side }} {{ formData.symbol }}
-          </span>
-        </div>
-        <div class="summary-row">
-          <span>Quantity</span>
-          <span class="value">{{ formData.quantity }} shares</span>
-        </div>
-        <div class="summary-row">
-          <span>Order Type</span>
-          <span class="value">{{ getOrderTypeLabel() }}</span>
-        </div>
-        <div class="summary-row" *ngIf="formData.orderType !== 'MARKET'">
-          <span>Price</span>
-          <span class="value">\${{ formData.price | number:'1.2-2' }}</span>
-        </div>
-        <div class="summary-row total">
-          <span>Est. Total</span>
+      <!-- Simple Summary -->
+      <div class="summary-section">
+        <div class="row">
+          <span>Est. Value</span>
           <span class="value">\${{ getEstimatedTotal() | number:'1.2-2' }}</span>
         </div>
+        <div class="row">
+          <span>Available Cash</span>
+          <span class="value">\${{ balance | number:'1.2-2' }}</span>
+        </div>
+        <div class="meter-bar">
+          <div class="fill" [style.width]="(getEstimatedTotal() / balance * 100) + '%'"
+               [class.over]="getEstimatedTotal() > balance"></div>
+        </div>
       </div>
 
-      <button class="submit-btn" 
-              [class.buy]="formData.side === 'BUY'" 
-              [class.sell]="formData.side === 'SELL'"
-              [disabled]="!isFormValid() || submitting"
+      <!-- Execute Action -->
+      <button class="submit-action" 
+              [disabled]="!isFormValid() || submitting" 
               (click)="submitOrder()">
         <span *ngIf="!submitting">
-          {{ formData.side === 'BUY' ? 'Buy' : 'Sell' }} {{ formData.symbol }}
+          {{ formData.side === 'BUY' ? 'Execute Buy Order' : 'Execute Sell Order' }}
         </span>
-        <span *ngIf="submitting" class="loading">
-          <svg class="spinner" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="60" stroke-dashoffset="0"/>
-          </svg>
+        <span *ngIf="submitting" class="loading-state">
+          <span class="spinner"></span>
           Processing...
         </span>
       </button>
     </div>
   `,
   styles: [`
-    .order-form-container {
-      background: white;
+    :host {
+      display: block;
+      color: #0f172a;
+    }
+
+    .order-form-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
       border-radius: 16px;
-      border: 1px solid #e5e7eb;
-      padding: 20px;
+      padding: 24px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      transition: all 0.2s ease;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .action-badge {
+      background: #f3f4f6;
+      color: #10b981;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 4px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+    .action-badge.sell {
+      color: #ef4444;
+    }
+
+    .header h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    .live-info {
+      text-align: right;
+    }
+    .live-info .symbol {
+      font-size: 12px;
+      font-weight: 600;
+      color: #8b5cf6;
+    }
+    .live-info .price {
+      font-family: 'SF Mono', monospace;
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .price.up { color: #10b981; }
+    .price.down { color: #ef4444; }
+
+    .indicator {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+      justify-content: flex-end;
+    }
+    .dot {
+      width: 5px;
+      height: 5px;
+      background: #10b981;
+      border-radius: 50%;
+      animation: blink 1s infinite alternate;
+    }
+
+    @keyframes blink { from { opacity: 0.4; } to { opacity: 1; } }
+
+    /* Controls */
+    .side-toggle {
+      display: flex;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+    .side-toggle button {
+      flex: 1;
+      border: none;
+      background: none;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    .side-toggle button.active {
+      background: #ffffff;
+      color: #8b5cf6;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .is-sell .side-toggle button.active {
+      color: #ef4444;
+    }
+
+    .form-grid {
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
-
-    .form-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #f3f4f6;
-    }
-
-    .form-header h3 {
-      margin: 0;
-      font-size: 16px;
+    .span-all { width: 100%; }
+    
+    label {
+      font-size: 11px;
       font-weight: 700;
-      color: #111827;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      display: block;
     }
 
-    .form-header h3 svg {
+    .grid-options {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .grid-options button, .segmented-control button {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 4px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .grid-options button:hover, .segmented-control button:hover {
+      border-color: #cbd5e1;
+      background: #f8fafc;
+    }
+    .grid-options button.active, .segmented-control button.active {
+      background: #f5f3ff;
+      border-color: #8b5cf6;
       color: #8b5cf6;
     }
-
-    .symbol-badge {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 12px;
-      background: #f3f4f6;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 700;
-      color: #374151;
-    }
-
-    .live-price {
-      font-family: 'SF Mono', 'Consolas', monospace;
-      font-weight: 600;
-    }
-
-    .live-price.positive { color: #10b981; }
-    .live-price.negative { color: #ef4444; }
-
-    .side-toggle {
-      display: flex;
-      gap: 8px;
-      padding: 4px;
-      background: #f3f4f6;
-      border-radius: 10px;
-    }
-
-    .side-btn {
-      flex: 1;
-      padding: 12px;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      transition: all 0.2s;
-      background: transparent;
-      color: #6b7280;
-    }
-
-    .side-btn.buy.active {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      color: white;
-      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-    }
-
-    .side-btn.sell.active {
-      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-      color: white;
-      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .form-group label {
-      font-size: 12px;
-      font-weight: 600;
-      color: #6b7280;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .form-group label svg {
-      color: #9ca3af;
+    .is-sell .grid-options button.active {
+      background: #fef2f2;
+      border-color: #ef4444;
+      color: #ef4444;
     }
 
     .form-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 100px 1fr;
       gap: 12px;
     }
 
-    .order-type-grid, .tif-grid {
-      display: flex;
-      gap: 6px;
-    }
-
-    .order-type-grid button, .tif-grid button {
-      flex: 1;
-      padding: 10px 8px;
-      border: 1px solid #e5e7eb;
-      background: white;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      color: #6b7280;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .order-type-grid button:hover, .tif-grid button:hover {
-      border-color: #c4b5fd;
-      color: #8b5cf6;
-    }
-
-    .order-type-grid button.active, .tif-grid button.active {
-      background: #f3e8ff;
-      border-color: #8b5cf6;
-      color: #8b5cf6;
-    }
-
-    .input-with-icon {
-      position: relative;
-    }
-
-    .input-with-icon input {
+    input {
       width: 100%;
-      padding: 10px 12px;
-      padding-right: 32px;
-      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
       border-radius: 8px;
+      padding: 10px 12px;
       font-size: 14px;
+      font-weight: 600;
+      color: #1e293b;
+      outline: none;
       transition: all 0.2s;
     }
-
-    .input-with-icon input:focus {
-      outline: none;
+    input:focus {
       border-color: #8b5cf6;
       box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
     }
 
-    .input-with-icon input.error {
-      border-color: #ef4444;
-    }
-
-    .input-icon {
-      position: absolute;
-      right: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: #10b981;
-      font-weight: bold;
-    }
-
-    .error-text {
-      font-size: 11px;
-      color: #ef4444;
-    }
-
-    .quantity-input {
+    .qty-control {
       display: flex;
       gap: 4px;
     }
-
-    .quantity-input input {
-      flex: 1;
-      min-width: 0;
-      padding: 10px;
-      border: 1px solid #e5e7eb;
+    .qty-control button {
+      width: 38px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
       border-radius: 8px;
-      font-size: 14px;
-      text-align: center;
-      font-weight: 600;
-    }
-
-    .quantity-input input:focus {
-      outline: none;
-      border-color: #8b5cf6;
-    }
-
-    .qty-btn {
-      padding: 8px 10px;
-      border: 1px solid #e5e7eb;
-      background: white;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      color: #6b7280;
+      font-weight: 700;
       cursor: pointer;
-      transition: all 0.15s;
+    }
+    .qty-control button:hover { background: #f1f5f9; }
+
+    .chip-row {
+      display: flex;
+      gap: 6px;
+    }
+    .chip-row button {
+      flex: 1;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+    }
+    .chip-row button:hover { 
+      background: #f1f5f9;
+      border-color: #cbd5e1;
     }
 
-    .qty-btn:hover {
-      background: #f3f4f6;
-      border-color: #8b5cf6;
-      color: #8b5cf6;
+    .price-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
     }
-
-    .price-input {
+    .input-with-action {
+      position: relative;
       display: flex;
       align-items: center;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      overflow: hidden;
-      transition: all 0.2s;
     }
-
-    .price-input:focus-within {
-      border-color: #8b5cf6;
-      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
-    }
-
-    .price-input .currency {
-      padding: 10px 12px;
-      background: #f9fafb;
-      border-right: 1px solid #e5e7eb;
-      font-weight: 600;
-      color: #6b7280;
-    }
-
-    .price-input input {
-      flex: 1;
-      padding: 10px 12px;
-      border: none;
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    .price-input input:focus {
-      outline: none;
-    }
-
-    .set-market {
-      padding: 8px 12px;
-      border: none;
-      background: #f3e8ff;
-      color: #8b5cf6;
-      font-size: 11px;
+    .symbol-prefix {
+      position: absolute;
+      left: 12px;
       font-weight: 700;
+      color: #94a3b8;
+    }
+    .input-with-action input { padding-left: 24px; padding-right: 36px; }
+
+    .auto-btn {
+      position: absolute;
+      right: 6px;
+      background: #f1f5f9;
+      border: none;
+      color: #64748b;
+      padding: 6px;
+      border-radius: 6px;
       cursor: pointer;
-      transition: all 0.15s;
+    }
+    .auto-btn.synced {
+      background: #10b98115;
+      color: #10b981;
     }
 
-    .set-market:hover {
-      background: #8b5cf6;
-      color: white;
-    }
-
-    .order-summary {
-      background: #f9fafb;
-      border-radius: 12px;
-      padding: 16px;
+    .segmented-control {
       display: flex;
-      flex-direction: column;
-      gap: 8px;
+      gap: 4px;
     }
+    .segmented-control button { flex: 1; }
 
-    .summary-header {
-      font-size: 12px;
-      font-weight: 700;
-      color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
+    /* Summary */
+    .summary-section {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid #f1f5f9;
     }
-
-    .summary-row {
+    .row {
       display: flex;
       justify-content: space-between;
+      margin-bottom: 8px;
       font-size: 13px;
-      color: #6b7280;
+      font-weight: 500;
+      color: #64748b;
     }
-
-    .summary-row .value {
-      font-weight: 600;
-      color: #374151;
-    }
-
-    .summary-row .value.buy { color: #10b981; }
-    .summary-row .value.sell { color: #ef4444; }
-
-    .summary-row.total {
-      padding-top: 8px;
-      margin-top: 4px;
-      border-top: 1px dashed #e5e7eb;
-      font-weight: 600;
-    }
-
-    .summary-row.total .value {
-      font-size: 16px;
-      color: #111827;
-    }
-
-    .submit-btn {
-      padding: 14px 24px;
-      border: none;
-      border-radius: 10px;
-      font-size: 15px;
+    .row .value {
       font-weight: 700;
+      color: #1e293b;
+    }
+
+    .meter-bar {
+      height: 4px;
+      background: #f1f5f9;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .fill {
+      height: 100%;
+      background: #8b5cf6;
+      transition: width 0.3s ease;
+    }
+    .fill.over { background: #ef4444; }
+
+    /* Action */
+    .submit-action {
+      width: 100%;
+      height: 52px;
+      background: #8b5cf6;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 15px;
       cursor: pointer;
+      margin-top: 24px;
       transition: all 0.2s;
+    }
+    .submit-action:hover:not(:disabled) {
+      background: #7c3aed;
+      box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.4);
+    }
+    .submit-action:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .is-sell .submit-action { background: #ef4444; }
+    .is-sell .submit-action:hover:not(:disabled) { background: #dc2626; }
+
+    .loading-state {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
     }
-
-    .submit-btn.buy {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      color: white;
-      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-    }
-
-    .submit-btn.buy:hover:not(:disabled) {
-      background: linear-gradient(135deg, #059669 0%, #047857 100%);
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
-    }
-
-    .submit-btn.sell {
-      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-      color: white;
-      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-    }
-
-    .submit-btn.sell:hover:not(:disabled) {
-      background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
-    }
-
-    .submit-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none !important;
-    }
-
-    .loading {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
     .spinner {
-      width: 18px;
-      height: 18px;
-      animation: spin 1s linear infinite;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
     }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
     }
   `]
 })
@@ -593,29 +497,42 @@ export class OrderFormComponent implements OnChanges {
   
   submitting = false;
   symbolValid = false;
-  symbolError: string | null = null;
+  userModifiedPrice = false;
+  userModifiedStopPrice = false;
+  
+  quickPercents = [25, 50, 75, 100];
   
   orderTypes = [
-    { value: 'MARKET', label: 'Market', description: 'Execute immediately at current market price' },
-    { value: 'LIMIT', label: 'Limit', description: 'Execute at specified price or better' },
-    { value: 'STOP', label: 'Stop', description: 'Trigger market order when price reaches stop' },
-    { value: 'STOP_LIMIT', label: 'Stop Lmt', description: 'Trigger limit order when price reaches stop' }
+    { value: 'MARKET', label: 'Market' },
+    { value: 'LIMIT', label: 'Limit' },
+    { value: 'STOP', label: 'Stop' },
+    { value: 'STOP_LIMIT', label: 'Stop Lmt' }
   ];
   
   timeInForceOptions = [
-    { value: 'DAY', label: 'Day', description: 'Valid for current trading day only' },
-    { value: 'GTC', label: 'GTC', description: 'Good til cancelled' },
-    { value: 'IOC', label: 'IOC', description: 'Immediate or cancel - fill immediately or cancel' },
-    { value: 'FOK', label: 'FOK', description: 'Fill or kill - complete fill or cancel entire order' }
+    { value: 'DAY', label: 'DAY' },
+    { value: 'GTC', label: 'GTC' },
+    { value: 'IOC', label: 'IOC' },
+    { value: 'FOK', label: 'FOK' }
   ];
   
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['symbol'] && this.symbol) {
       this.formData.symbol = this.symbol;
+      this.userModifiedPrice = false;
+      this.userModifiedStopPrice = false;
       this.validateSymbol();
     }
+    
     if (changes['quote'] && this.quote) {
-      this.formData.price = this.quote.price;
+      if (!this.userModifiedPrice || this.formData.price === 0) {
+        this.formData.price = this.quote.price;
+      }
+      if (!this.userModifiedStopPrice && (this.formData.orderType === 'STOP' || this.formData.orderType === 'STOP_LIMIT')) {
+        if (!this.formData.stopPrice || this.formData.stopPrice === 0) {
+          this.formData.stopPrice = this.quote.price;
+        }
+      }
     }
   }
   
@@ -625,6 +542,12 @@ export class OrderFormComponent implements OnChanges {
   
   setOrderType(type: any): void {
     this.formData.orderType = type;
+    if (type !== 'STOP' && type !== 'STOP_LIMIT') {
+      this.formData.stopPrice = undefined;
+      this.userModifiedStopPrice = false;
+    } else if (!this.formData.stopPrice && this.quote) {
+      this.formData.stopPrice = this.quote.price;
+    }
   }
   
   setTimeInForce(tif: any): void {
@@ -637,10 +560,25 @@ export class OrderFormComponent implements OnChanges {
       this.formData.quantity = newQty;
     }
   }
+
+  applyPercentOfBalance(percent: number): void {
+    const price = this.formData.orderType === 'MARKET' ? (this.quote?.price || 1) : (this.formData.price || 1);
+    const targetValue = (this.balance * percent) / 100;
+    this.formData.quantity = Math.floor(targetValue / price) || 1;
+  }
+  
+  onPriceInput(): void {
+    this.userModifiedPrice = true;
+  }
+  
+  onStopPriceInput(): void {
+    this.userModifiedStopPrice = true;
+  }
   
   setMarketPrice(): void {
     if (this.quote) {
       this.formData.price = this.quote.price;
+      this.userModifiedPrice = false;
     }
   }
   
@@ -652,12 +590,6 @@ export class OrderFormComponent implements OnChanges {
   validateSymbol(): void {
     const validSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'AMD', 'JPM', 'V', 'JNJ', 'WMT', 'XOM', 'DIS', 'NFLX', 'PYPL', 'INTC', 'CRM', 'ORCL', 'ADBE', 'BAC', 'GS', 'MA', 'PFE', 'UNH', 'HD', 'NKE', 'MCD', 'SBUX', 'COST'];
     this.symbolValid = validSymbols.includes(this.formData.symbol);
-    this.symbolError = this.symbolValid ? null : 'Invalid symbol';
-  }
-  
-  getOrderTypeLabel(): string {
-    const type = this.orderTypes.find(t => t.value === this.formData.orderType);
-    return type ? type.label : this.formData.orderType;
   }
   
   getEstimatedTotal(): number {
@@ -670,17 +602,14 @@ export class OrderFormComponent implements OnChanges {
     if (this.formData.quantity < 1) return false;
     if (this.formData.orderType !== 'MARKET' && this.formData.price <= 0) return false;
     if ((this.formData.orderType === 'STOP' || this.formData.orderType === 'STOP_LIMIT') && (!this.formData.stopPrice || this.formData.stopPrice <= 0)) return false;
+    if (this.getEstimatedTotal() > this.balance && this.formData.side === 'BUY') return false;
     return true;
   }
   
   submitOrder(): void {
     if (!this.isFormValid()) return;
-    
     this.submitting = true;
     this.orderSubmit.emit({ ...this.formData });
-    
-    setTimeout(() => {
-      this.submitting = false;
-    }, 1000);
+    setTimeout(() => { this.submitting = false; }, 1000);
   }
 }
